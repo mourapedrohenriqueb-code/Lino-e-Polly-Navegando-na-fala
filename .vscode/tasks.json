@@ -1,0 +1,40 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Iniciar FonoPirata",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Limpar resultado local de testes",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"restore",
+				"--",
+				"node_modules/.vite/vitest/results.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Salvar tarefa do projeto",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"add",
+				".vscode/tasks.json"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
