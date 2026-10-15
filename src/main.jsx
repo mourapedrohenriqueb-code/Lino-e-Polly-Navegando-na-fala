@@ -25,6 +25,7 @@ const shopItems = [
 ];
 
 const normalizeText=(text='')=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9\s]/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
+const assetUrl=(name)=>`${import.meta.env.BASE_URL}assets/${name}`;
 
 const copyTextToClipboard=async(text)=>{
  try{
@@ -295,7 +296,7 @@ function App(){
          <header className="hud">
            <div className="profile">
              <div className={`avatar ${speaking ? 'speaking' : ''}`}>
-               <img src="/assets/lino.png" alt="Avatar do aluno" />
+               <img src={assetUrl('lino.png')} alt="Avatar do aluno" />
                <span className="mouth" />
              </div>
              <div>
@@ -311,7 +312,7 @@ function App(){
          </header>
 
          <main className="mapWrap">
-           <img className="map" src="/assets/map.png" alt="Mapa de ilhas" />
+           <img className="map" src={assetUrl('map.png')} alt="Mapa de ilhas" />
            <div className="titleRibbon">
              <strong>FonoPirata</strong>
              <small>Fale • Aprenda • Conquiste</small>
@@ -332,8 +333,8 @@ function App(){
                <span>{island.unlocked ? island.id : <Lock size={20} />}</span>
              </button>
            ))}
-           <button type="button" className={`mascot linoMap ${linoGreeting ? 'greeting' : ''}`} onClick={greetWithLino} aria-label="Mostrar saudação do Lino" title="Mostrar saudação do Lino"><span className="linoBubble">Ahoy, Está na hora da lição, Ahoy</span><img src="/assets/lino.png" alt="Mascote Lino" /></button>
-           <div className="mascot pollyMap"><img src="/assets/polly.png" alt="Mascote Polly" /></div>
+           <button type="button" className={`mascot linoMap ${linoGreeting ? 'greeting' : ''}`} onClick={greetWithLino} aria-label="Mostrar saudação do Lino" title="Mostrar saudação do Lino"><span className="linoBubble">Ahoy, Está na hora da lição, Ahoy</span><img src={assetUrl('lino.png')} alt="Mascote Lino" /></button>
+           <div className="mascot pollyMap"><img src={assetUrl('polly.png')} alt="Mascote Polly" /></div>
          </main>
 
          <nav className="bottom">
@@ -392,7 +393,7 @@ function Lesson({island,onBack,speak,listen,listening,message,onClearMessage,spe
      <button type="button" className="back" onClick={onBack}><ArrowLeft /></button>
      <div className="lessonHero">
        <div className="islandCard">
-         <img src="/assets/map.png" alt={island.title} />
+         <img src={assetUrl('map.png')} alt={island.title} />
          <div className="islandOverlay">
            <h1>{island.title}</h1>
            <p>{island.desc}</p>
@@ -432,7 +433,7 @@ function Lesson({island,onBack,speak,listen,listening,message,onClearMessage,spe
            </div>
          )}
        </div>
-       <img className="pollyLesson" src="/assets/polly.png" alt="Polly" />
+       <img className="pollyLesson" src={assetUrl('polly.png')} alt="Polly" />
      </section>
    </div>
  );
@@ -446,7 +447,7 @@ function Progress({xp,completed,islands,onBack})
      <div className="parchment">
        <h1>Meu Progresso</h1>
        <div className="progressTop">
-         <img src="/assets/lino.png" alt="Pedro" />
+         <img src={assetUrl('lino.png')} alt="Pedro" />
          <div>
            <h2>Pedro</h2>
            <p>Nível {Math.max(1, Math.floor((xp + 1) / 60))}</p>
@@ -536,8 +537,7 @@ function Donation({onBack})
 
 function ShareApp({onBack})
 {
- const localHost=window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
- const appLink=localHost ? 'http://192.168.1.208:5173/' : window.location.href;
+ const appLink=new URL(import.meta.env.BASE_URL,window.location.origin).href;
  const qrCanvasRef=useRef(null);
  const [copyStatus,setCopyStatus]=useState('');
 

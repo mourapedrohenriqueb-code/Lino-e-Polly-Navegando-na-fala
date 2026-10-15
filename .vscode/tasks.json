@@ -14,23 +14,138 @@
 			"group": "build"
 		},
 		{
-			"label": "Limpar resultado local de testes",
+			"label": "Build site for GitHub Pages",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run project tests",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"test"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Set GitHub repository origin",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"remote",
+				"set-url",
+				"origin",
+				"https://github.com/mourapedrohenriqueb-code/Lino-e-Polly-Navegando-na-fala.git"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Fetch GitHub main branch",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"fetch",
+				"origin",
+				"main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check GitHub publication changes",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check generated file tracking",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"ls-files",
+				"dist"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Review repository history",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"--no-pager",
+				"log",
+				"--oneline",
+				"--graph",
+				"--decorate",
+				"--all",
+				"-8"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Check branch relationship",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"merge-base",
+				"HEAD",
+				"origin/main"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Remove generated bundle file",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"clean",
+				"-f",
+				"--",
+				"dist/assets/index-Cgc1EAsU.js"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Restore generated build and test outputs",
 			"type": "shell",
 			"command": "git",
 			"args": [
 				"restore",
 				"--",
+				"dist",
 				"node_modules/.vite/vitest/results.json"
 			],
 			"isBackground": false,
 			"problemMatcher": []
 		},
 		{
-			"label": "Salvar tarefa do projeto",
+			"label": "Stage GitHub Pages deployment",
 			"type": "shell",
 			"command": "git",
 			"args": [
 				"add",
+				"src/main.jsx",
+				"README.md",
+				"vite.config.js",
+				".github/workflows/deploy.yml",
 				".vscode/tasks.json"
 			],
 			"isBackground": false,

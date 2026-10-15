@@ -1,12 +1,20 @@
-# FonoPirata — versão refeita a partir da referência enviada
+# Lino e Polly Navegando na Fala
 
-Esta versão usa as imagens de referência fornecidas na conversa para manter o visual do mapa e dos dois mascotes.
+Jogo educativo de fala com mapa de ilhas, atividades de pronúncia e os mascotes Lino e Polly.
 
-## Rodar
+## Acessar o aplicativo
 
-```bash
+Depois que a publicação do GitHub Pages concluir, o aplicativo estará disponível em:
+
+https://mourapedrohenriqueb-code.github.io/Lino-e-Polly-Navegando-na-fala/
+
+## Executar localmente
+
+```sh
 npm install
 npm run dev
 ```
 
-Abra o endereço local mostrado pelo Vite no Chrome ou Edge.
+## Publicação
+
+O workflow em `.github/workflows/deploy.yml` compila e publica o aplicativo no GitHub Pages sempre que há uma atualização na branch `main`.
