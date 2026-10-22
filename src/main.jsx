@@ -8,12 +8,12 @@ import { supabaseClient, supabaseConfigured, supabaseConfigurationMessage } from
 import './styles.css';
 
 const baseIslands = [
- {id:1,x:13,y:34,title:'Ilha do Alfabeto',word:'A',answer:'A',type:'letra',desc:'Explore todas as letras do alfabeto e fortaleça os sons iniciais da fala.',difficulty:'Fácil',examples: alphabetLetters},
- {id:2,x:31,y:15,title:'Ilha das Sílabas',word:'PA',answer:'PA',type:'silaba',desc:'Pratique sílabas frequentes do português, organizadas para leitura e fala.',difficulty:'Fácil',examples: portugueseSyllables},
- {id:3,x:50,y:11,title:'Ilha das Palavras',word:'CASA',answer:'CASA',type:'palavra',desc:'Diga palavras do cotidiano com entonação e precisão.',difficulty:'Média',examples: wordBank},
- {id:4,x:68,y:44,title:'Ilha das Frases',word:phraseBank[0],answer:phraseBank[0],type:'frase',desc:'Pratique frases variadas para trabalhar clareza e fluência.',difficulty:'Média',examples: phraseBank},
- {id:5,x:85,y:17,title:'Ilha dos Textos',word:textBank[0],answer:textBank[0],type:'texto',desc:'Leia textos curtos com entonação, ritmo e boa fluência.',difficulty:'Difícil',examples: textBank},
- {id:6,x:84,y:55,title:'Ilha dos Livros Infantis',word:bookRecommendations[0].title,answer:bookRecommendations[0].title,type:'livros',desc:'Conheça livros infantis disponíveis gratuitamente em bibliotecas digitais.',difficulty:'Desafio final',examples: bookRecommendations.map((book)=>book.title),books:bookRecommendations}
+ {id:1,x:13,y:34,mapTitle:'Ilha Inicial',title:'Ilha do Alfabeto',word:'A',answer:'A',type:'letra',desc:'Explore todas as letras do alfabeto e fortaleça os sons iniciais da fala.',difficulty:'Fácil',examples: alphabetLetters},
+ {id:2,x:31,y:15,mapTitle:'Ilha das Sílabas',title:'Ilha das Sílabas',word:'PA',answer:'PA',type:'silaba',desc:'Pratique sílabas frequentes do português, organizadas para leitura e fala.',difficulty:'Fácil',examples: portugueseSyllables},
+ {id:3,x:50,y:11,mapTitle:'Ilha das Palavras',title:'Ilha das Palavras',word:'CASA',answer:'CASA',type:'palavra',desc:'Diga palavras do cotidiano com entonação e precisão.',difficulty:'Média',examples: wordBank},
+ {id:4,x:68,y:44,mapTitle:'Ilha das Frases',title:'Ilha das Frases',word:phraseBank[0],answer:phraseBank[0],type:'frase',desc:'Pratique frases variadas para trabalhar clareza e fluência.',difficulty:'Média',examples: phraseBank},
+ {id:5,x:85,y:17,mapTitle:'Ilha dos Textos',title:'Ilha dos Textos',word:textBank[0],answer:textBank[0],type:'texto',desc:'Leia textos curtos com entonação, ritmo e boa fluência.',difficulty:'Difícil',examples: textBank},
+ {id:6,x:84,y:55,mapTitle:'Ilha dos Livros',title:'Ilha dos Livros Infantis',word:bookRecommendations[0].title,answer:bookRecommendations[0].title,type:'livros',desc:'Conheça livros infantis disponíveis gratuitamente em bibliotecas digitais.',difficulty:'Desafio final',examples: bookRecommendations.map((book)=>book.title),books:bookRecommendations}
 ];
 
 const shopItems = [
@@ -64,7 +64,35 @@ function getValidProgress(value){
  if(value.totalCorrect!==undefined && (!Number.isInteger(value.totalCorrect) || value.totalCorrect<0 || value.totalCorrect>(value.totalAttempts ?? 0))) return null;
  if(value.practiceByIsland!==undefined && (!value.practiceByIsland || typeof value.practiceByIsland!=='object' || Array.isArray(value.practiceByIsland) || Object.values(value.practiceByIsland).some((count)=>!Number.isInteger(count) || count<0))) return null;
  if(value.reviewItems!==undefined && (!Array.isArray(value.reviewItems) || !value.reviewItems.every((item)=>typeof item==='string' && /^\d+:\d+$/.test(item)))) return null;
+ if(value.profileName!==undefined && (typeof value.profileName!=='string' || value.profileName.length>32)) return null;
+ if(value.avatarData!==undefined && (typeof value.avatarData!=='string' || value.avatarData.length>150000 || !/^data:image\/jpeg;base64,/.test(value.avatarData))) return null;
  return value;
+}
+
+function resizeProfileImage(file){
+ return new Promise((resolve,reject)=>{
+   const image=new Image();
+   const imageUrl=URL.createObjectURL(file);
+   image.onload=()=>{
+     URL.revokeObjectURL(imageUrl);
+     const scale=Math.min(1,320/Math.max(image.naturalWidth,image.naturalHeight));
+     const canvas=document.createElement('canvas');
+     canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+     canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+     const context=canvas.getContext('2d');
+     if(!context){
+       reject(new Error('Não foi possível preparar essa foto.'));
+       return;
+     }
+     context.drawImage(image,0,0,canvas.width,canvas.height);
+     resolve(canvas.toDataURL('image/jpeg',0.82));
+   };
+   image.onerror=()=>{
+     URL.revokeObjectURL(imageUrl);
+     reject(new Error('Não foi possível abrir essa foto.'));
+   };
+   image.src=imageUrl;
+ });
 }
 
 function speechMatches(expectedText,spokenText){
@@ -122,6 +150,12 @@ function App(){
  const [selectedIslandId,setSelectedIslandId]=useState(savedProfile?.selectedIslandId ?? 1);
  const [selectedExampleIndex,setSelectedExampleIndex]=useState(savedProfile?.selectedExampleIndex ?? 0);
  const [xp,setXp]=useState(savedProfile?.xp ?? 120);
+ const [profileName,setProfileName]=useState(typeof savedProfile?.profileName==='string'?savedProfile.profileName:'Pedro');
+ const [avatarData,setAvatarData]=useState(typeof savedProfile?.avatarData==='string' && /^data:image\/jpeg;base64,/.test(savedProfile.avatarData)?savedProfile.avatarData:'');
+ const [profileEditorOpen,setProfileEditorOpen]=useState(false);
+ const [draftProfileName,setDraftProfileName]=useState(typeof savedProfile?.profileName==='string'?savedProfile.profileName:'Pedro');
+ const [draftAvatarData,setDraftAvatarData]=useState(typeof savedProfile?.avatarData==='string' && /^data:image\/jpeg;base64,/.test(savedProfile.avatarData)?savedProfile.avatarData:'');
+ const [profileError,setProfileError]=useState('');
  const [coins,setCoins]=useState(savedProfile?.coins ?? 80);
  const [completed,setCompleted]=useState(savedProfile?.completed ?? getInitialProgress());
  const [startingIslandId,setStartingIslandId]=useState(savedProfile?.startingIslandId ?? 1);
@@ -178,6 +212,41 @@ function App(){
    setScreen('diagnostic-result');
  };
 
+ const openProfileEditor=()=>{
+   setDraftProfileName(profileName);
+   setDraftAvatarData(avatarData);
+   setProfileError('');
+   setProfileEditorOpen(true);
+ };
+
+ const handleProfilePhoto=async(event)=>{
+   const [file]=event.currentTarget.files ?? [];
+   event.currentTarget.value='';
+   if(!file) return;
+   if(!file.type.startsWith('image/')){
+     setProfileError('Escolha um arquivo de imagem.');
+     return;
+   }
+   try{
+     setDraftAvatarData(await resizeProfileImage(file));
+     setProfileError('');
+   }catch(error){
+     console.error('Não foi possível usar a foto escolhida.',error);
+     setProfileError(error.message || 'Não foi possível abrir essa foto.');
+   }
+ };
+
+ const saveProfile=()=>{
+   const trimmedName=draftProfileName.trim();
+   if(!trimmedName){
+     setProfileError('Digite um nome para o perfil.');
+     return;
+   }
+   setProfileName(trimmedName);
+   setAvatarData(draftAvatarData);
+   setProfileEditorOpen(false);
+ };
+
  useEffect(()=>{
    const loadingTimer=window.setTimeout(()=>setIsLoading(false),5000);
    return ()=>window.clearTimeout(loadingTimer);
@@ -188,13 +257,13 @@ function App(){
      window.localStorage.setItem(profileStorageKey,JSON.stringify({
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
      }));
    }catch(error){
      console.error('Não foi possível salvar o progresso neste dispositivo.',error);
      setMessage('Não foi possível salvar o progresso neste dispositivo.');
    }
- },[screen,selectedIslandId,selectedExampleIndex,xp,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
 
  useEffect(()=>{
    try{
@@ -239,6 +308,10 @@ function App(){
        setSelectedIslandId(saved.selectedIslandId);
        setSelectedExampleIndex(saved.selectedExampleIndex);
        setXp(saved.xp);
+       setProfileName(saved.profileName ?? 'Pedro');
+       setAvatarData(saved.avatarData ?? '');
+       setDraftProfileName(saved.profileName ?? 'Pedro');
+       setDraftAvatarData(saved.avatarData ?? '');
        setCoins(saved.coins);
        setCompleted(saved.completed);
        setStartingIslandId(saved.startingIslandId ?? 1);
@@ -287,7 +360,7 @@ function App(){
      const progress={
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
      };
      try{
        const {error}=await supabaseClient.from('profiles').upsert({
@@ -302,7 +375,7 @@ function App(){
      }
    },500);
    return ()=>window.clearTimeout(cloudSyncTimer.current);
- },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
 
  useEffect(()=>{
    if(!supabaseClient || !currentUser || screen!=='settings' || availableLanguages.length) return undefined;
@@ -743,17 +816,17 @@ function App(){
       {screen === 'home' && (
         <>
           <header className="hud">
-            <div className="profile">
+            <button type="button" className="profile" onClick={openProfileEditor} aria-label="Editar nome e foto do perfil">
               <div className={`avatar ${speaking ? 'speaking' : ''}`}>
-                <img src={assetUrl('lino.png')} alt="Avatar do aluno" />
+                <img src={avatarData || assetUrl('lino.png')} alt="" />
                 <span className="mouth" />
               </div>
               <div>
-                <b>Pedro</b>
+                <b>{profileName}</b>
                 <span>Nível {Math.floor(xp/100)+1}</span>
                 <div className="xpbar"><i style={{width:`${xp % 100}%`}} /></div>
               </div>
-            </div>
+            </button>
             <div className="hudRight">
               <div className="coin" aria-label={`${coins} moedas e ${xp} pontos de experiência`} title="Moedas e experiência"><span>🪙</span><b>{coins}</b><span className="coinXp">⭐ {xp} XP</span></div>
               <button type="button" onClick={() => setScreen('settings')} aria-label="Configurações"><Settings size={20} /></button>
@@ -780,8 +853,21 @@ function App(){
                 className={`islandNode islandNode-${island.id} ${!island.unlocked ? 'locked' : ''}`}
                 style={{left: `${island.x}%`, top: `${island.y}%`, '--island-delay': `${island.id * -0.42}s`}}
                 onClick={() => openIsland(island)}
+                aria-label={`${island.mapTitle}, ${island.unlocked ? 'disponível' : 'bloqueada'}`}
               >
-                <span>{island.unlocked ? island.id : <Lock size={20} />}</span>
+                <span className="islandLabel">{island.mapTitle}</span>
+                <span className={`islandMiniature islandMiniature-${island.id}`} aria-hidden="true">
+                  <span className="miniIsland">
+                    <span className="miniatureDetails" />
+                  </span>
+                  {island.id===1 && <span className="miniLetters"><i>A</i><i>B</i><i>C</i><i>D</i><i>E</i></span>}
+                  {island.id===2 && <span className="miniSyllables"><i>PA</i><i>LE</i><i>MI</i></span>}
+                  {island.id===3 && <span className="miniWords"><i>CASA</i><i>SOL</i></span>}
+                  {island.id===4 && <span className="miniPhrases"><i>OLÁ!</i><i>✦</i></span>}
+                  {island.id===5 && <span className="miniText"><i>ABC</i><i /><i /><i /></span>}
+                  {island.id===6 && <span className="miniBooks"><i>📖</i><i>⭐</i><i>✦</i></span>}
+                  {!island.unlocked && <span className="miniLock"><Lock size={17} /></span>}
+                </span>
               </button>
             ))}
             <button type="button" className={`mascot linoMap ${linoGreeting ? 'greeting' : ''}`} onClick={greetWithLino} aria-label="Mostrar saudação do Lino" title="Mostrar saudação do Lino"><span className="linoBubble">Ahoy, Está na hora da lição, Ahoy</span><img src={assetUrl('lino.png')} alt="Mascote Lino" /></button>
@@ -796,6 +882,28 @@ function App(){
             <button type="button" onClick={() => setScreen('share')}><Share2 /><span>Link</span></button>
             <button type="button" onClick={() => setScreen('settings')}><Settings /><span>Config</span></button>
           </nav>
+          {profileEditorOpen && (
+            <div className="profileEditorBackdrop" onMouseDown={(event)=>{if(event.target===event.currentTarget) setProfileEditorOpen(false);}}>
+              <form className="profileEditor" role="dialog" aria-modal="true" aria-labelledby="profileEditorTitle" onSubmit={(event)=>{event.preventDefault();saveProfile();}}>
+                <button type="button" className="profileEditorClose" onClick={()=>setProfileEditorOpen(false)} aria-label="Fechar edição">×</button>
+                <h2 id="profileEditorTitle">Seu perfil</h2>
+                <div className="profilePreview">
+                  <img src={draftAvatarData || assetUrl('lino.png')} alt="Prévia da foto do perfil" />
+                </div>
+                <label className="profileField">
+                  Nome
+                  <input value={draftProfileName} maxLength={32} onChange={(event)=>setDraftProfileName(event.target.value)} autoFocus />
+                </label>
+                <label className="profilePhotoButton">
+                  Escolher foto da galeria
+                  <input type="file" accept="image/*" onChange={handleProfilePhoto} />
+                </label>
+                <small className="profileLevel">Nível atual: {Math.floor(xp/100)+1}</small>
+                {profileError && <p className="profileError" role="alert">{profileError}</p>}
+                <button type="submit" className="profileSave">Salvar perfil</button>
+              </form>
+            </div>
+          )}
         </>
       )}
 
