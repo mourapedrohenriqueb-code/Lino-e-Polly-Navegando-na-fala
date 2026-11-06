@@ -1,8 +1,10 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {Volume2,Mic,Star,Lock,ArrowLeft,Settings,Home,Check,BookOpen,Trophy,ShoppingBag,Speaker,BrainCircuit,Waves,Heart,Copy,Share2,ExternalLink,LogIn,LogOut,Languages,Target,Lightbulb,Headphones,Bookmark,Compass,AudioLines} from 'lucide-react';
+import {Volume2,Mic,Star,Lock,ArrowLeft,Settings,Home,Check,BookOpen,Trophy,ShoppingBag,Speaker,BrainCircuit,Waves,Heart,Copy,Share2,ExternalLink,LogIn,LogOut,Languages,Target,Lightbulb,Headphones,Bookmark,Compass,AudioLines,Sparkles} from 'lucide-react';
 import QRCode from 'qrcode';
-import { addCompletedExample, alphabetLetters, bookRecommendations, getDiagnosticQuestions, getDiagnosticSummary, getFirstUncompletedExampleIndex, getInitialProgress, getNextUncompletedExampleIndex, getSyllableGuide, getUnlockedIslands, phraseBank, portugueseSyllables, speechMatches, textBank, wordBank } from './gameLogic';
+import { addCompletedExample, alphabetLetters, areAllExamplesComplete, bookRecommendations, getDiagnosticQuestions, getDiagnosticSummary, getFirstUncompletedExampleIndex, getInitialProgress, getSyllableGuide, getUnlockedIslands, phraseBank, portugueseSyllables, speechMatches, textBank, wordBank } from './gameLogic';
+import AdventureHub from './AdventureHub';
+import { getDailyMission, recordDailyAttempt } from './adventure';
 import { observeAndTranslate, translateTexts } from './services/autoTranslate';
 import { supabaseClient, supabaseConfigured, supabaseConfigurationMessage } from './services/supabaseClient';
 import './styles.css';
@@ -66,6 +68,12 @@ function getValidProgress(value){
  if(value.reviewItems!==undefined && (!Array.isArray(value.reviewItems) || !value.reviewItems.every((item)=>typeof item==='string' && /^\d+:\d+$/.test(item)))) return null;
  if(value.profileName!==undefined && (typeof value.profileName!=='string' || value.profileName.length>32)) return null;
  if(value.avatarData!==undefined && (typeof value.avatarData!=='string' || value.avatarData.length>150000 || !/^data:image\/jpeg;base64,/.test(value.avatarData))) return null;
+ if(value.dailyMission!==undefined && (!value.dailyMission || typeof value.dailyMission!=='object' || Array.isArray(value.dailyMission) || !/^\d{4}-\d{2}-\d{2}$/.test(value.dailyMission.date) || !Number.isInteger(value.dailyMission.attempts) || value.dailyMission.attempts<0 || value.dailyMission.attempts>3)) return null;
+ if(value.mascot!==undefined && value.mascot!=='lino' && value.mascot!=='polly') return null;
+ if(value.boat!==undefined && !['⛵','🚤','🛶','🏴‍☠️'].includes(value.boat)) return null;
+ if(value.decoration!==undefined && !['⭐','🐚','🌴','🦀'].includes(value.decoration)) return null;
+ if(value.reduceMotion!==undefined && typeof value.reduceMotion!=='boolean') return null;
+ if(value.largeText!==undefined && typeof value.largeText!=='boolean') return null;
  return value;
 }
 
@@ -122,8 +130,15 @@ function App(){
  const hasCompletedExampleProgress=savedProfile?.completedExamples!==undefined;
  const [screen,setScreen]=useState(savedProfile?.screen==='lesson'?'lesson':savedProfile?'home':'diagnostic');
  const [isLoading,setIsLoading]=useState(true);
- const [selectedIslandId,setSelectedIslandId]=useState(hasCompletedExampleProgress ? savedProfile?.selectedIslandId ?? 1 : Math.min(savedProfile?.selectedIslandId ?? 1,savedProfile?.startingIslandId ?? 1));
- const [selectedExampleIndex,setSelectedExampleIndex]=useState(savedProfile?.selectedExampleIndex ?? 0);
+ const [selectedIslandId,setSelectedIslandId]=useState(Math.min(savedProfile?.selectedIslandId ?? 1,Math.max(1,(savedProfile?.completed ?? 0)+1)));
+ const [selectedExampleIndex,setSelectedExampleIndex]=useState(()=>{
+   if(!hasCompletedExampleProgress) return 0;
+   const savedIsland=baseIslands.find((island)=>island.id===Math.min(savedProfile?.selectedIslandId ?? 1,Math.max(1,(savedProfile?.completed ?? 0)+1)));
+   return getFirstUncompletedExampleIndex(savedProfile?.completedExamples?.[savedIsland?.id],savedIsland?.examples.length ?? 1)
+     ?? savedProfile?.selectedExampleIndex
+     ?? 0;
+ });
+ const [lessonMode,setLessonMode]=useState('standard');
  const [xp,setXp]=useState(savedProfile?.xp ?? 120);
  const [profileName,setProfileName]=useState(typeof savedProfile?.profileName==='string'?savedProfile.profileName:'Pedro');
  const [avatarData,setAvatarData]=useState(typeof savedProfile?.avatarData==='string' && /^data:image\/jpeg;base64,/.test(savedProfile.avatarData)?savedProfile.avatarData:'');
@@ -139,6 +154,12 @@ function App(){
  const [totalCorrect,setTotalCorrect]=useState(savedProfile?.totalCorrect ?? 0);
  const [practiceByIsland,setPracticeByIsland]=useState(savedProfile?.practiceByIsland ?? {});
  const [reviewItems,setReviewItems]=useState(savedProfile?.reviewItems ?? []);
+ const [dailyMission,setDailyMission]=useState(()=>getDailyMission(savedProfile?.dailyMission));
+ const [mascot,setMascot]=useState(savedProfile?.mascot==='polly'?'polly':'lino');
+ const [boat,setBoat]=useState(['⛵','🚤','🛶','🏴‍☠️'].includes(savedProfile?.boat)?savedProfile.boat:'⛵');
+ const [decoration,setDecoration]=useState(['⭐','🐚','🌴','🦀'].includes(savedProfile?.decoration)?savedProfile.decoration:'⭐');
+ const [reduceMotion,setReduceMotion]=useState(savedProfile?.reduceMotion===true);
+ const [largeText,setLargeText]=useState(savedProfile?.largeText===true);
  const [voiceEnabled,setVoiceEnabled]=useState(true);
  const [soundEnabled,setSoundEnabled]=useState(true);
  const [ambientEnabled,setAmbientEnabled]=useState(()=>window.localStorage.getItem('fonoAmbientEnabled') !== 'false');
@@ -164,7 +185,7 @@ function App(){
  const cloudSyncTimer=useRef(null);
 
  const diagnosticQuestions = useMemo(() => getDiagnosticQuestions(), []);
- const islands = useMemo(() => getUnlockedIslands(baseIslands, completed, startingIslandId), [completed,startingIslandId]);
+ const islands = useMemo(() => getUnlockedIslands(baseIslands, completed), [completed]);
  const selectedIsland = islands.find((island)=>island.id === selectedIslandId) ?? islands[0];
  const activeExampleIndex=Math.min(selectedExampleIndex,selectedIsland.examples.length-1);
  const selectedExample = selectedIsland.examples[activeExampleIndex] ?? selectedIsland.answer;
@@ -233,13 +254,14 @@ function App(){
      window.localStorage.setItem(profileStorageKey,JSON.stringify({
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems,
+       dailyMission,mascot,boat,decoration,reduceMotion,largeText
      }));
    }catch(error){
      console.error('Não foi possível salvar o progresso neste dispositivo.',error);
      setMessage('Não foi possível salvar o progresso neste dispositivo.');
    }
- },[screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems,dailyMission,mascot,boat,decoration,reduceMotion,largeText]);
 
  useEffect(()=>{
    try{
@@ -282,8 +304,12 @@ function App(){
      }
      if(saved){
        const hasSavedExampleProgress=saved.completedExamples!==undefined;
-       setSelectedIslandId(hasSavedExampleProgress ? saved.selectedIslandId : Math.min(saved.selectedIslandId,saved.startingIslandId ?? 1));
-       setSelectedExampleIndex(saved.selectedExampleIndex);
+       const availableIslandId=Math.min(saved.selectedIslandId,Math.max(1,saved.completed+1));
+       setSelectedIslandId(availableIslandId);
+       const availableIsland=baseIslands.find((island)=>island.id===availableIslandId);
+       setSelectedExampleIndex(hasSavedExampleProgress
+         ? getFirstUncompletedExampleIndex(saved.completedExamples?.[availableIslandId],availableIsland.examples.length) ?? saved.selectedExampleIndex
+         : 0);
        setXp(saved.xp);
        setProfileName(saved.profileName ?? 'Pedro');
        setAvatarData(saved.avatarData ?? '');
@@ -298,6 +324,12 @@ function App(){
        setTotalCorrect(saved.totalCorrect ?? 0);
        setPracticeByIsland(saved.practiceByIsland ?? {});
        setReviewItems(saved.reviewItems ?? []);
+       setDailyMission(getDailyMission(saved.dailyMission));
+       setMascot(saved.mascot==='polly'?'polly':'lino');
+       setBoat(['⛵','🚤','🛶','🏴‍☠️'].includes(saved.boat)?saved.boat:'⛵');
+       setDecoration(['⭐','🐚','🌴','🦀'].includes(saved.decoration)?saved.decoration:'⭐');
+       setReduceMotion(saved.reduceMotion===true);
+       setLargeText(saved.largeText===true);
        setScreen(saved.screen==='lesson'?'lesson':'home');
      }else{
        setScreen(savedProfile?.screen==='lesson'?'lesson':savedProfile?'home':'diagnostic');
@@ -338,7 +370,8 @@ function App(){
      const progress={
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems,
+       dailyMission,mascot,boat,decoration,reduceMotion,largeText
      };
      try{
        const {error}=await supabaseClient.from('profiles').upsert({
@@ -353,7 +386,7 @@ function App(){
      }
    },500);
    return ()=>window.clearTimeout(cloudSyncTimer.current);
- },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems,dailyMission,mascot,boat,decoration,reduceMotion,largeText]);
 
  useEffect(()=>{
    if(!supabaseClient || !currentUser || screen!=='settings' || availableLanguages.length) return undefined;
@@ -568,7 +601,7 @@ function App(){
    recognition.lang = language;
    recognition.interimResults = false;
    recognition.continuous = false;
-   recognition.maxAlternatives = 3;
+   recognition.maxAlternatives = 5;
 
    recognition.onstart = () => {
      setListening(true);
@@ -587,25 +620,35 @@ function App(){
    recognition.onresult = (event) => {
      const finalResult=event.results[event.results.length-1];
      const alternatives=Array.from(finalResult ?? []).map((item)=>item.transcript?.trim() ?? '').filter(Boolean);
-     const matchedTranscript=alternatives.find((transcript)=>speechMatches(exercisePrompt || selectedExample,transcript));
+     const matchedTranscript=alternatives.find((transcript)=>speechMatches(exercisePrompt || selectedExample,transcript,language));
      const latestTranscript=matchedTranscript ?? alternatives[0];
      setTotalAttempts((value)=>value+1);
+     setDailyMission((value)=>recordDailyAttempt(value));
      setPracticeByIsland((current)=>({...current,[selectedIsland.id]:(current[selectedIsland.id] ?? 0)+1}));
      if(!latestTranscript) return;
 
      if(matchedTranscript){
+       const completedForIsland=completedExamples[selectedIsland.id] ?? [];
+       const nextRequiredIndex=getFirstUncompletedExampleIndex(completedForIsland,selectedIsland.examples.length);
+       if(activeExampleIndex!==nextRequiredIndex && !completedForIsland.includes(activeExampleIndex)){
+         setMessage(`Complete primeiro o exemplo ${nextRequiredIndex+1} para liberar o próximo.`);
+         return;
+       }
        setTotalCorrect((value)=>value+1);
        setXp((value)=>value + 30);
        setCoins((value)=>value + 15);
        const islandCompletedExamples=addCompletedExample(completedExamples[selectedIsland.id],activeExampleIndex);
-       const nextExampleIndex=getNextUncompletedExampleIndex(islandCompletedExamples,activeExampleIndex,selectedIsland.examples.length);
+       const nextExampleIndex=getFirstUncompletedExampleIndex(islandCompletedExamples,selectedIsland.examples.length);
        setCompletedExamples((current)=>({...current,[selectedIsland.id]:islandCompletedExamples}));
-       if(nextExampleIndex===null){
+       const islandIsComplete=areAllExamplesComplete(islandCompletedExamples,selectedIsland.examples.length);
+       if(islandIsComplete){
          setCompleted((value)=>Math.max(value,selectedIsland.id));
          setMessage(`Parabéns! Você concluiu todos os ${selectedIsland.examples.length} itens desta ilha.`);
        }else{
          setSelectedExampleIndex(nextExampleIndex);
-         setMessage(`Muito bem! Próximo exemplo: ${nextExampleIndex+1} de ${selectedIsland.examples.length}.`);
+         setMessage(selectedIsland.type==='letra'
+           ? `Muito bem! Agora fale somente a letra ${selectedIsland.examples[nextExampleIndex]}.`
+           : `Muito bem! Próximo exemplo: ${nextExampleIndex+1} de ${selectedIsland.examples.length}.`);
        }
        if(nextExampleIndex===null && selectedIsland.id < islands.length){
          window.setTimeout(()=>{
@@ -619,7 +662,9 @@ function App(){
        }
        return;
      }
-     setMessage(`O reconhecimento ouviu “${latestTranscript}”. Tente novamente falando perto do microfone e em um lugar silencioso.`);
+     setMessage(selectedIsland.type==='letra'
+       ? `Ouvi “${latestTranscript}”. Tente falar somente a letra ${selectedExample}, sem recitar o alfabeto.`
+       : `O reconhecimento ouviu “${latestTranscript}”. Tente novamente falando perto do microfone e em um lugar silencioso.`);
    };
 
    try{
@@ -637,8 +682,37 @@ function App(){
    }
    setSelectedIslandId(island.id);
    setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[island.id],island.examples.length) ?? 0);
+   setLessonMode('standard');
    setScreen('lesson');
    setMessage('');
+ };
+
+ const selectLessonExample=(exampleIndex)=>{
+   const completedIndexes=completedExamples[selectedIsland.id] ?? [];
+   const nextRequiredIndex=getFirstUncompletedExampleIndex(completedIndexes,selectedIsland.examples.length);
+   if(!completedIndexes.includes(exampleIndex) && exampleIndex!==nextRequiredIndex){
+     setMessage(`Complete primeiro o exemplo ${nextRequiredIndex+1} para liberar o próximo.`);
+     return;
+   }
+   setSelectedExampleIndex(exampleIndex);
+ };
+
+ const startIslandStory=(islandId)=>{
+   const island=islands.find((item)=>item.id===islandId);
+   if(!island?.unlocked) return;
+   setSelectedIslandId(island.id);
+   setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[island.id],island.examples.length) ?? 0);
+   setLessonMode('standard');
+   setScreen('lesson');
+ };
+
+ const startListeningPractice=()=>{
+   const island=islands.find((item)=>item.id===selectedIslandId && item.unlocked) ?? islands.find((item)=>item.unlocked);
+   if(!island) return;
+   setSelectedIslandId(island.id);
+   setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[island.id],island.examples.length) ?? 0);
+   setLessonMode('listen');
+   setScreen('lesson');
  };
 
  const sendLoginCode=async(identifier)=>{
@@ -746,7 +820,7 @@ function App(){
  };
 
  return (
-   <div className="app" ref={appRootRef}>
+   <div className={`app${reduceMotion?' reducedMotion':''}${largeText?' largeText':''}`} ref={appRootRef}>
       {globalStatus && (
         <div className="globalNotice" role="status">
           <span>{globalStatus}</span>
@@ -778,9 +852,9 @@ function App(){
         <DiagnosticResultScreen
           result={diagnosticResult}
           onContinue={() => {
-            setSelectedIslandId(diagnosticResult.startingIslandId);
-            const startingIsland=baseIslands.find((island)=>island.id===diagnosticResult.startingIslandId);
-            setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[diagnosticResult.startingIslandId],startingIsland.examples.length) ?? 0);
+            setSelectedIslandId(1);
+            setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[1],baseIslands[0].examples.length) ?? 0);
+            setLessonMode('standard');
             setScreen('lesson');
           }}
         />
@@ -805,7 +879,7 @@ function App(){
           <header className="hud">
             <button type="button" className="profile" onClick={openProfileEditor} aria-label="Editar nome e foto do perfil">
               <div className={`avatar ${speaking ? 'speaking' : ''}`}>
-                <img src={avatarData || assetUrl('lino.png')} alt="" />
+                <img src={avatarData || assetUrl(mascot==='polly'?'polly-purple.png':'lino.png')} alt="" />
                 <span className="mouth" />
               </div>
               <div>
@@ -832,7 +906,8 @@ function App(){
             <div className="wavePatch wavePatchOne" aria-hidden="true" />
             <div className="wavePatch wavePatchTwo" aria-hidden="true" />
             <div className="mapBoat boatOne" aria-hidden="true">⛵</div>
-            <div className="mapBoat boatTwo" aria-hidden="true">🚤</div>
+            <div className="mapBoat boatTwo" aria-hidden="true">{boat}</div>
+            <div className="mapDecoration" aria-hidden="true">{decoration}</div>
             {islands.map((island) => (
               <button
                 key={island.id}
@@ -857,8 +932,8 @@ function App(){
                 </span>
               </button>
             ))}
-            <button type="button" className={`mascot linoMap ${linoGreeting ? 'greeting' : ''}`} onClick={greetWithLino} aria-label="Mostrar saudação do Lino" title="Mostrar saudação do Lino"><span className="linoBubble">Ahoy, Está na hora da lição, Ahoy</span><img src={assetUrl('lino.png')} alt="Mascote Lino" /></button>
-            <div className="mascot pollyMap"><img src={assetUrl('polly-purple.png')} alt="Polly, a polva roxa" /></div>
+            <button type="button" className={`mascot linoMap ${linoGreeting ? 'greeting' : ''}`} onClick={greetWithLino} aria-label={`Mostrar saudação de ${mascot==='polly'?'Polly':'Lino'}`} title={`Mostrar saudação de ${mascot==='polly'?'Polly':'Lino'}`}><span className="linoBubble">Ahoy, está na hora da lição!</span><img src={assetUrl(mascot==='polly'?'polly-purple.png':'lino.png')} alt={`Mascote ${mascot==='polly'?'Polly':'Lino'}`} /></button>
+            <div className="mascot pollyMap"><img src={assetUrl(mascot==='polly'?'lino.png':'polly-purple.png')} alt={mascot==='polly'?'Lino, seu companheiro de aventura':'Polly, a polva roxa'} /></div>
           </main>
 
           <nav className="bottom">
@@ -868,6 +943,7 @@ function App(){
             <button type="button" onClick={() => setScreen('donation')}><Heart /><span>Doação</span></button>
             <button type="button" onClick={() => setScreen('share')}><Share2 /><span>Link</span></button>
             <button type="button" onClick={() => setScreen('settings')}><Settings /><span>Config</span></button>
+            <button type="button" onClick={() => setScreen('adventure')}><Compass /><span>Aventura</span></button>
           </nav>
           {profileEditorOpen && (
             <div className="profileEditorBackdrop" onMouseDown={(event)=>{if(event.target===event.currentTarget) setProfileEditorOpen(false);}}>
@@ -875,7 +951,7 @@ function App(){
                 <button type="button" className="profileEditorClose" onClick={()=>setProfileEditorOpen(false)} aria-label="Fechar edição">×</button>
                 <h2 id="profileEditorTitle">Seu perfil</h2>
                 <div className="profilePreview">
-                  <img src={draftAvatarData || assetUrl('lino.png')} alt="Prévia da foto do perfil" />
+                  <img src={draftAvatarData || assetUrl(mascot==='polly'?'polly-purple.png':'lino.png')} alt="Prévia da foto do perfil" />
                 </div>
                 <label className="profileField">
                   Nome
@@ -899,10 +975,14 @@ function App(){
           island={selectedIsland}
          selectedExample={selectedExample}
          selectedExampleIndex={activeExampleIndex}
-         onSelectExample={setSelectedExampleIndex}
-         onBack={() => setScreen('home')}
+         nextRequiredExampleIndex={getFirstUncompletedExampleIndex(completedExamples[selectedIsland.id],selectedIsland.examples.length)}
+         completedExampleIndices={completedExamples[selectedIsland.id] ?? []}
+         onSelectExample={selectLessonExample}
+          onBack={() => {setLessonMode('standard');setScreen('home');}}
          speak={() => speakText(exercisePrompt || selectedExample)}
          speakTwice={() => speakText(exercisePrompt || selectedExample,2)}
+          lessonMode={lessonMode}
+          onStartPractice={() => setLessonMode('standard')}
          listen={handleVoiceInput}
          ownedItems={ownedItems}
          isSavedReview={reviewItems.includes(`${selectedIsland.id}:${activeExampleIndex}`)}
@@ -912,6 +992,28 @@ function App(){
           speaking={speaking}
           message={message}
           onClearMessage={() => setMessage('')}
+        />
+      )}
+
+      {screen === 'adventure' && (
+        <AdventureHub
+          islands={islands}
+          completed={completed}
+          totalAttempts={totalAttempts}
+          totalCorrect={totalCorrect}
+          dailyMission={dailyMission}
+          mascot={mascot}
+          boat={boat}
+          decoration={decoration}
+          onChooseMascot={setMascot}
+          onChooseBoat={setBoat}
+          onChooseDecoration={setDecoration}
+          onStartStory={startIslandStory}
+          onStartListening={startListeningPractice}
+          onBack={() => setScreen('home')}
+          onSpeak={(text) => speakText(text)}
+          reduceMotion={reduceMotion}
+          onToggleReduceMotion={() => setReduceMotion((value) => !value)}
         />
       )}
 
@@ -943,13 +1045,17 @@ function App(){
           onToggleSound={() => setSoundEnabled((value) => !value)}
           onToggleRecognition={() => setRecognitionEnabled((value) => !value)}
           onToggleAmbient={() => setAmbientEnabled((value) => !value)}
+          reduceMotion={reduceMotion}
+          onToggleReduceMotion={() => setReduceMotion((value) => !value)}
+          largeText={largeText}
+          onToggleLargeText={() => setLargeText((value) => !value)}
         />
       )}
    </div>
  );
 }
 
-function Lesson({island,selectedExample,selectedExampleIndex,onSelectExample,onBack,speak,speakTwice,listen,listening,message,onClearMessage,speaking,promptTranslating,ownedItems,isSavedReview,onToggleReview})
+function Lesson({island,selectedExample,selectedExampleIndex,nextRequiredExampleIndex,completedExampleIndices,onSelectExample,onBack,speak,speakTwice,listen,listening,message,onClearMessage,speaking,promptTranslating,ownedItems,isSavedReview,onToggleReview,lessonMode,onStartPractice})
 {
  const pageSize=20;
  const pageCount=Math.ceil(island.examples.length/pageSize);
@@ -1001,8 +1107,18 @@ function Lesson({island,selectedExample,selectedExampleIndex,onSelectExample,onB
          <p>
            {island.type === 'livros'
              ? 'Escolha um livro para abrir a biblioteca digital e ler no site de origem.'
-             : 'Escute o exemplo e depois fale no microfone com calma. O reconhecimento automático pode variar conforme o aparelho e o ambiente.'}
+             : island.type === 'letra'
+               ? `Fale somente a letra ${selectedExample}. Quando ela for reconhecida, a próxima letra aparece automaticamente.`
+               : 'Escute o exemplo e depois fale no microfone com calma. O reconhecimento automático pode variar conforme o aparelho e o ambiente.'}
          </p>
+         {lessonMode==='listen' && (
+           <div className="listenFirstCard">
+             <Headphones size={22} />
+             <div><strong>Modo escutar primeiro</strong><span>Ouça o exemplo no seu ritmo. Quando quiser, continue para a atividade normal.</span></div>
+             <button type="button" onClick={speakTwice} disabled={promptTranslating}><Volume2 size={17} />Ouvir com calma</button>
+             <button type="button" onClick={onStartPractice}>Agora vou praticar</button>
+           </div>
+         )}
          {ownedItems.some((item)=>['syllable-guide','slow-voice','first-sound','double-listen','review-book','focus-compass'].includes(item)) && (
            <div className="lessonTools" aria-label="Ferramentas de aprendizagem">
              {ownedItems.includes('slow-voice') && <span className="lessonToolStatus"><Headphones size={17} /> Voz lenta ativada</span>}
@@ -1031,15 +1147,18 @@ function Lesson({island,selectedExample,selectedExampleIndex,onSelectExample,onB
          )}
          <div className="examplesPanel">
            <div className="miniHeader">
-             <span>{island.type==='silaba'?'Sílabas frequentes':'Banco de exercícios'}</span>
+             <span>{island.type==='silaba'?'Sílabas frequentes':island.type==='letra'?'Letras em ordem':'Banco de exercícios'}</span>
              <strong>{Array.isArray(island.examples) ? island.examples.length : 1} itens</strong>
            </div>
            <div className="exampleList">
-             {examples.map((item, index) => (
-               <button type="button" key={`${item}-${pageStart+index}`} className={`exampleChip ${pageStart+index === selectedExampleIndex ? 'active' : ''}`} onClick={()=>onSelectExample(pageStart+index)}>
+             {examples.map((item, index) => {
+               const exampleIndex=pageStart+index;
+               const isCompleted=completedExampleIndices.includes(exampleIndex);
+               const isNextRequired=exampleIndex===nextRequiredExampleIndex;
+               return <button type="button" key={`${item}-${exampleIndex}`} className={`exampleChip ${exampleIndex === selectedExampleIndex ? 'active' : ''}`} onClick={()=>onSelectExample(exampleIndex)} disabled={!isCompleted && !isNextRequired} aria-current={isNextRequired?'step':undefined} title={!isCompleted && !isNextRequired?'Conclua os exemplos anteriores primeiro.':undefined}>
                  {item}
-               </button>
-             ))}
+               </button>;
+             })}
            </div>
            {pageCount>1 && (
              <div className="examplePagination">
@@ -1062,7 +1181,7 @@ function Lesson({island,selectedExample,selectedExampleIndex,onSelectExample,onB
          {!island.books && (
            <button type="button" className="mic" onClick={listen} disabled={listening}>
              <Mic size={42} />
-             <span>{promptTranslating ? 'Traduzindo...' : listening ? 'Ouvindo...' : 'Falar exemplo'}</span>
+             <span>{promptTranslating ? 'Traduzindo...' : listening ? 'Ouvindo...' : island.type==='letra'?'Falar a letra':'Falar exemplo'}</span>
            </button>
          )}
          {message && (
@@ -1364,7 +1483,7 @@ function AccountScreen({configured,user,busy,message,onBack,onSendCode,onVerifyC
  );
 }
 
-function SettingsScreen({onBack,onOpenAccount,user,language,languages,languageMessage,onChangeLanguage,voiceEnabled,soundEnabled,recognitionEnabled,ambientEnabled,onToggleVoice,onToggleSound,onToggleRecognition,onToggleAmbient})
+function SettingsScreen({onBack,onOpenAccount,user,language,languages,languageMessage,onChangeLanguage,voiceEnabled,soundEnabled,recognitionEnabled,ambientEnabled,onToggleVoice,onToggleSound,onToggleRecognition,onToggleAmbient,reduceMotion,onToggleReduceMotion,largeText,onToggleLargeText})
 {
  return (
    <div className="settingsScreen">
@@ -1409,7 +1528,18 @@ function SettingsScreen({onBack,onOpenAccount,user,language,languages,languageMe
            <span>Música clássica calma</span>
            <strong>{ambientEnabled ? 'Ligado' : 'Desligado'}</strong>
          </button>
+         <button type="button" className="switchRow" onClick={onToggleReduceMotion} aria-pressed={reduceMotion}>
+           <Sparkles size={18} />
+           <span>Reduzir animações</span>
+           <strong>{reduceMotion ? 'Ligado' : 'Desligado'}</strong>
+         </button>
+         <button type="button" className="switchRow" onClick={onToggleLargeText} aria-pressed={largeText}>
+           <span aria-hidden="true">Aa</span>
+           <span>Texto maior</span>
+           <strong>{largeText ? 'Ligado' : 'Desligado'}</strong>
+         </button>
          <small className="soundNote">Trilha original sintetizada, sem gravação de terceiros. O navegador inicia o áudio após o primeiro toque.</small>
+         <div className="privacyNote"><strong>Privacidade da voz</strong><span>O aplicativo não salva gravações de voz. O reconhecimento usa o serviço de fala do navegador, que pode processar áudio conforme as configurações e a política desse serviço.</span></div>
        </div>
      </div>
    </div>
@@ -1473,7 +1603,7 @@ function DiagnosticResultScreen({ result, onContinue }) {
           <strong>Importante:</strong>
           <span>{result.disclaimer}</span>
         </div>
-        <button type="button" className="submitDiagnostic" onClick={onContinue}>Ir para a ilha sugerida</button>
+        <button type="button" className="submitDiagnostic" onClick={onContinue}>Começar pela Ilha do Alfabeto</button>
       </div>
     </div>
   );

@@ -422,7 +422,7 @@ export function getDiagnosticSummary(score) {
 
   return {
     title: 'Sugestão para começar',
-    message: `Pelas respostas, sugerimos começar pela ${islandNames[startingIslandId - 1]}. Você pode mudar de ilha quando quiser.`,
+    message: `Pelas respostas, sugerimos praticar conteúdos da ${islandNames[startingIslandId - 1]}. A aventura começa na Ilha do Alfabeto; cada próxima ilha será liberada depois de concluir todos os exemplos da ilha atual.`,
     tone: startingIslandId <= 2 ? 'alerta' : startingIslandId <= 4 ? 'media' : 'excelente',
     startingIslandId,
     disclaimer: 'Isto não é um diagnóstico nem substitui uma avaliação fonoaudiológica. Se houver preocupação com a fala, audição ou comunicação, converse com um fonoaudiólogo ou pediatra.'
@@ -454,7 +454,42 @@ export function getFirstUncompletedExampleIndex(completedExamples, totalExamples
   return getNextUncompletedExampleIndex(completedExamples, -1, totalExamples);
 }
 
-export function speechMatches(expectedText, spokenText) {
+export function areAllExamplesComplete(completedExamples, totalExamples) {
+  if (!Number.isInteger(totalExamples) || totalExamples <= 0) return false;
+  const completed = new Set(Array.isArray(completedExamples) ? completedExamples : []);
+  return Array.from({ length: totalExamples }, (_, index) => completed.has(index)).every(Boolean);
+}
+
+const portugueseLetterNames = {
+  A: ['A', 'AH'],
+  B: ['BE', 'BEH'],
+  C: ['CE', 'SE'],
+  D: ['DE'],
+  E: ['E', 'EH'],
+  F: ['EFE'],
+  G: ['GE', 'JE'],
+  H: ['AGA'],
+  I: ['I'],
+  J: ['JOTA'],
+  K: ['KA', 'CA'],
+  L: ['ELE'],
+  M: ['EME'],
+  N: ['ENE'],
+  O: ['O'],
+  P: ['PE'],
+  Q: ['QUE'],
+  R: ['ERRE'],
+  S: ['ESSE'],
+  T: ['TE'],
+  U: ['U'],
+  V: ['VE'],
+  W: ['DABLIO'],
+  X: ['XIS'],
+  Y: ['IPSILON'],
+  Z: ['ZE']
+};
+
+export function speechMatches(expectedText, spokenText, language = 'pt-BR') {
   const normalize = (text = '') => text.normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9\s]/g, ' ')
@@ -464,9 +499,19 @@ export function speechMatches(expectedText, spokenText) {
   const expected = normalize(expectedText).split(/\s+/).filter(Boolean);
   const spoken = normalize(spokenText).split(/\s+/).filter(Boolean);
   if (!expected.length || !spoken.length) return false;
+  if (/^[A-Z]$/.test(normalize(expectedText))) {
+    const fillers = new Set(['LETRA', 'LETRINHA', 'SOM']);
+    const spokenLetter = spoken.filter((word) => !fillers.has(word));
+    if (spokenLetter.length > 1 && ['A', 'O'].includes(spokenLetter[0])) spokenLetter.shift();
+    if (spokenLetter.length !== 1) return false;
+    const expectedLetter = expected[0];
+    if (spokenLetter[0] === expectedLetter) return true;
+    if (!language.toLowerCase().startsWith('pt')) return false;
+    return (portugueseLetterNames[expectedLetter] ?? []).includes(spokenLetter[0]);
+  }
   if (expected.length === 1 && spoken.length === 1) {
     const distance = editDistance(expected[0], spoken[0]);
-    return expected[0].length === 1 ? distance === 0 : distance <= Math.max(1, Math.floor(expected[0].length * 0.2));
+    return distance <= Math.max(1, Math.floor(expected[0].length * 0.2));
   }
   const matched = expected.filter((word) => spoken.some((spokenWord) => word === spokenWord || editDistance(word, spokenWord) <= 1)).length;
   return matched / expected.length >= 0.82;
@@ -486,13 +531,13 @@ function editDistance(first, second) {
   return row[second.length];
 }
 
-export function isIslandUnlocked(islandId, completedCount, startingIslandId = 1) {
-  return islandId === 1 || islandId <= startingIslandId || completedCount >= islandId - 1;
+export function isIslandUnlocked(islandId, completedCount) {
+  return islandId === 1 || completedCount >= islandId - 1;
 }
 
-export function getUnlockedIslands(islands, completedCount, startingIslandId = 1) {
+export function getUnlockedIslands(islands, completedCount) {
   return islands.map((island) => ({
     ...island,
-    unlocked: isIslandUnlocked(island.id, completedCount, startingIslandId),
+    unlocked: isIslandUnlocked(island.id, completedCount),
   }));
 }

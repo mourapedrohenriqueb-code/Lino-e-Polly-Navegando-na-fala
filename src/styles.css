@@ -572,6 +572,7 @@ button, input { font: inherit; }
 }
 .linoMap:focus-visible { outline: 3px solid #ffe28a; outline-offset: 4px; }
 .pollyMap { width: 120px; height: 120px; left: 40px; bottom: 0; transform: rotate(-5deg); }
+.mapDecoration { position: absolute; z-index: 3; left: 52%; bottom: 20%; font-size: clamp(24px, 3vw, 38px); filter: drop-shadow(0 3px 2px rgba(0,51,70,.4)); }
 .linoMap img { animation: linoFloat 2.2s ease-in-out infinite, mascotGlow 4.2s ease-in-out infinite; transform-origin: center bottom; }
 .pollyMap img, .pollyLesson { animation: pollyFloat 2.1s ease-in-out infinite, mascotGlow 3.8s ease-in-out infinite; transform-origin: center bottom; filter: drop-shadow(0 8px 5px rgba(0,59,85,0.3)); }
 .linoMap.greeting img { animation: linoGreet 0.45s ease-in-out 4; }
@@ -643,6 +644,7 @@ button, input { font: inherit; }
 }
 
 .bottom button.active { color: #e08b16; }
+.bottom button:focus-visible, .switchRow:focus-visible { outline: 3px solid #e6a826; outline-offset: 3px; }
 
 .lesson, .progress, .shop, .settingsScreen, .shareApp, .donation {
   min-height: 100vh;
@@ -1605,6 +1607,7 @@ button, input { font: inherit; }
   color: #fff;
   border-color: #0b89c9;
 }
+.exampleChip:disabled { opacity: .48; cursor: not-allowed; }
 
 .faceDemo { width: 180px; height: 180px; display: grid; place-items: center; position: relative; }
 .head3d {

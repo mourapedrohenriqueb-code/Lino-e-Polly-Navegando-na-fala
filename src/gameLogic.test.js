@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   alphabetLetters,
   addCompletedExample,
+  areAllExamplesComplete,
   getDiagnosticQuestions,
   getDiagnosticSummary,
   getFirstUncompletedExampleIndex,
@@ -52,10 +53,10 @@ describe('sistema de ilhas', () => {
     expect(computeUnlocked(islands, 1)[2].unlocked).toBe(false);
   });
 
-  test('a sugestão do questionário libera a ilha indicada sem marcar ilhas como concluídas', () => {
+  test('a sugestão do questionário não pula a ordem obrigatória das ilhas', () => {
     const islands = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const result = getUnlockedIslands(islands, 0, 3);
-    expect(result.map((island) => island.unlocked)).toEqual([true, true, true]);
+    expect(result.map((island) => island.unlocked)).toEqual([true, false, false]);
     expect(getInitialProgress()).toBe(0);
   });
 });
@@ -77,6 +78,41 @@ describe('progresso dos exemplos', () => {
     expect(speechMatches('A', 'a')).toBe(true);
     expect(speechMatches('A', 'B')).toBe(false);
     expect(speechMatches('A', 'casa')).toBe(false);
+  });
+
+  test('reconhece o nome falado de uma letra isolada em português', () => {
+    expect(speechMatches('B', 'bê')).toBe(true);
+    expect(speechMatches('C', 'cê')).toBe(true);
+    expect(speechMatches('H', 'agá')).toBe(true);
+    expect(speechMatches('X', 'xis')).toBe(true);
+    expect(speechMatches('A', 'a letra a')).toBe(true);
+  });
+
+  test('não considera o alfabeto inteiro como resposta para uma letra', () => {
+    expect(speechMatches('A', 'a bê cê')).toBe(false);
+    expect(speechMatches('B', 'a bê cê')).toBe(false);
+    expect(speechMatches('B', 'be', 'en-US')).toBe(false);
+  });
+
+  test('a ilha seguinte só libera quando todas as atividades da ilha atual acabam', () => {
+    const islands = [{ id: 1 }, { id: 2 }];
+
+    expect(getUnlockedIslands(islands, 0).map((island) => island.unlocked)).toEqual([true, false]);
+    expect(getUnlockedIslands(islands, 1).map((island) => island.unlocked)).toEqual([true, true]);
+  });
+
+  test('o alfabeto deve ser concluído em sequência, uma letra por vez', () => {
+    let completed = [];
+
+    alphabetLetters.forEach((letter, index) => {
+      expect(getFirstUncompletedExampleIndex(completed, alphabetLetters.length)).toBe(index);
+      expect(areAllExamplesComplete(completed, alphabetLetters.length)).toBe(false);
+      completed = addCompletedExample(completed, index);
+    });
+
+    expect(getFirstUncompletedExampleIndex(completed, alphabetLetters.length)).toBeNull();
+    expect(areAllExamplesComplete(completed, alphabetLetters.length)).toBe(true);
+    expect(areAllExamplesComplete(completed.slice(1), alphabetLetters.length)).toBe(false);
   });
 });
 

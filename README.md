@@ -13,6 +13,9 @@ Jogo educativo de fala com mapa de ilhas, atividades de pronúncia e os mascotes
 - A tradução de textos visíveis usa Google Cloud Translation por uma função Supabase. A lista inclui os idiomas suportados pelo Google; não representa todos os idiomas existentes. Conteúdo enviado para tradução é processado pelo Google.
 - Cada exemplo reconhecido rende 30 XP e 15 moedas. A loja troca moedas por ferramentas de prática: divisão silábica, voz mais lenta, pista da letra inicial, repetição do modelo, rodada de foco e caderno de revisão. As ferramentas compradas são salvas junto ao progresso.
 - A tela de progresso resume tentativas, reconhecimentos, precisão, atividade por ilha, conquistas e exemplos guardados para rever. Esses dados descrevem o uso do jogo e não são uma avaliação clínica.
+- A área **Aventura** acrescenta capítulos opcionais, missão diária sem penalidade, personalização visual, jogos de rimas e memória, modo para ouvir primeiro, orientações para cuidadores e controles de acessibilidade.
+- As ilhas são feitas em sequência: cada letra ou exemplo precisa ser reconhecido para avançar, e a próxima ilha só é liberada quando todos os exemplos da ilha atual forem concluídos.
+- Para letras isoladas, o reconhecimento aceita a letra e alguns nomes falados em português, como “bê” e “cê”. O funcionamento depende do reconhecimento de voz disponível no navegador e no aparelho.
 
 ## Acessar o aplicativo
 
@@ -54,4 +57,10 @@ O banco aplica políticas RLS para que cada pessoa leia e altere apenas o própr
 
 ## Publicação
 
-O workflow em `.github/workflows/deploy.yml` compila e publica o aplicativo no GitHub Pages sempre que há uma atualização na branch `main`.
+O workflow em `.github/workflows/deploy.yml` compila e publica o aplicativo no GitHub Pages sempre que há uma atualização na branch `main`. O site publica `robots.txt` e `sitemap.xml` para ajudar os mecanismos de busca a encontrá-lo.
+
+Para solicitar indexação no Google, verifique a propriedade do site no [Google Search Console](https://search.google.com/search-console) e envie o sitemap:
+
+`https://mourapedrohenriqueb-code.github.io/Lino-e-Polly-Navegando-na-fala/sitemap.xml`
+
+A indexação e a posição nos resultados dependem do Google e não podem ser garantidas pelo aplicativo.

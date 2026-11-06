@@ -1,0 +1,144 @@
+.adventureScreen {
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 92px 20px 30px;
+  background:
+    radial-gradient(circle at 85% 4%, rgba(255,255,255,.28), transparent 18rem),
+    linear-gradient(160deg, #d7f6f7, #edf9dc 58%, #c3eced);
+}
+
+.adventureScreen > .back { position: absolute; top: 18px; left: 20px; }
+.adventureHero, .adventureCard, .adventureAccessibility {
+  width: min(940px, 100%);
+  margin: 0 auto 16px;
+}
+
+.adventureHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 26px;
+  border: 3px solid #387a85;
+  border-radius: 24px;
+  background: linear-gradient(130deg, #fff8df, #d6f1e5);
+  box-shadow: 0 6px 0 #34717c;
+}
+
+.adventureEyebrow { display: flex; align-items: center; gap: 7px; color: #267387; font-size: 12px; font-weight: 1000; letter-spacing: .08em; }
+.adventureHero h1 { margin: 5px 0; color: #4a321c; font-size: clamp(28px, 4vw, 42px); line-height: 1.05; }
+.adventureHero p { margin: 0; color: #506348; font-weight: 800; }
+.adventureHeroIcon { font-size: 68px; filter: drop-shadow(0 5px 2px #a77a31); }
+
+.adventureCard {
+  padding: 20px;
+  border: 2px solid #c6dbb4;
+  border-radius: 20px;
+  background: #fffdf5;
+  box-shadow: 0 4px 0 rgba(92, 130, 87, .28);
+}
+
+.adventureSectionTitle { display: flex; align-items: center; gap: 12px; }
+.adventureSectionTitle > span { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 14px; background: #e6f4d8; font-size: 24px; }
+.adventureSectionTitle h2 { margin: 0; color: #46341e; font-size: 22px; }
+.adventureSectionTitle p { margin: 2px 0 0; color: #66745e; font-size: 14px; font-weight: 800; }
+.storyCard > p { margin: 15px 0; color: #51452f; font-size: 16px; line-height: 1.55; }
+
+.adventurePrimary, .adventureSecondary, .missionFooter button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 13px;
+  background: #167da5;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.adventurePrimary { background: linear-gradient(#ffca54, #f3a332); color: #493016; box-shadow: 0 3px 0 #c37d28; }
+.adventureSecondary { background: #eaf5df; border: 2px solid #b5ce9e; color: #365634; }
+.adventurePrimary:hover, .adventureSecondary:hover, .missionFooter button:hover { filter: brightness(1.04); transform: translateY(-1px); }
+
+.missionProgress { height: 15px; margin: 16px 0 10px; overflow: hidden; border: 2px solid #b7ce9e; border-radius: 99px; background: #edf2e4; }
+.missionProgress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #64b96b, #b6d84e); transition: width .25s ease; }
+.missionFooter { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #4b5c3c; }
+.missionFooter button { min-height: 38px; padding: 8px 12px; }
+
+.cosmeticGroups { display: grid; gap: 14px; margin-top: 16px; }
+.cosmeticGroups fieldset { margin: 0; padding: 12px; border: 1px solid #d5dfbf; border-radius: 14px; }
+.cosmeticGroups legend { padding: 0 6px; color: #5a6847; font-weight: 900; }
+.cosmeticOptions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cosmeticOptions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 62px; min-height: 45px; padding: 7px 12px; border: 2px solid #d5dfbf; border-radius: 12px; background: #fff; color: #493a26; font-size: 22px; cursor: pointer; }
+.cosmeticOptions button img { width: 34px; height: 34px; object-fit: contain; }
+.cosmeticOptions button.chosen { border-color: #1b8c91; background: #e2f6ec; box-shadow: 0 0 0 2px rgba(27,140,145,.13); }
+
+.adventureGame { margin-top: 18px; padding: 16px; border: 1px solid #dae4cb; border-radius: 16px; background: #fbfff7; }
+.adventureGame + .adventureGame { margin-top: 12px; }
+.rhymePrompt { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 0; }
+.rhymePrompt strong { color: #267387; font: 900 32px 'Baloo 2', sans-serif; letter-spacing: .08em; }
+.rhymePrompt button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #e4f2dc; color: #32623a; cursor: pointer; }
+.rhymeChoices { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; }
+.rhymeChoices button { min-width: 92px; padding: 10px 14px; border: 2px solid #b8d5a5; border-radius: 13px; background: #fff; color: #3d572f; font-weight: 900; cursor: pointer; }
+.gameFeedback, .gameComplete { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #eaf6df; color: #365534; font-weight: 800; text-align: center; }
+.gameComplete button { margin-left: 5px; border: 0; background: transparent; color: #087b9d; font-weight: 900; text-decoration: underline; cursor: pointer; }
+.memoryBoard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: min(440px, 100%); margin: 14px auto 0; }
+.memoryColumn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.memoryColumn button { min-height: 56px; border: 2px solid #cbdcb8; border-radius: 13px; background: #fff; color: #4c5c37; font-size: 22px; font-weight: 900; cursor: pointer; }
+.memoryColumn button.selected { border-color: #1584a0; background: #e5f6f8; }
+.memoryColumn button.matched { border-color: #7ebd79; background: #eaf7e4; cursor: default; }
+.adventureGame > .adventureSecondary { margin-top: 12px; }
+
+.familyCard summary { cursor: pointer; list-style: none; }
+.familyCard summary::-webkit-details-marker { display: none; }
+.familyCard summary > span { display: flex; align-items: center; gap: 10px; color: #46341e; font-size: 19px; font-weight: 1000; }
+.familyCard summary > span svg { color: #cf6373; }
+.familyCard summary small { display: block; margin: 4px 0 0 30px; color: #66745e; font-weight: 800; }
+.familyContent { padding-top: 14px; color: #51452f; line-height: 1.5; }
+.familyProgress { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.familyProgress strong { padding: 8px 11px; border-radius: 10px; background: #eaf5df; color: #3e6039; font-size: 13px; }
+.familyIslandChoices { display: flex; flex-wrap: wrap; gap: 8px; }
+.familyIslandChoices button { padding: 8px 11px; border: 1px solid #b8d5a5; border-radius: 10px; background: #f4faeb; color: #3d572f; font-weight: 800; cursor: pointer; }
+.familyContent li { margin: 7px 0; }
+.familyTips { margin-top: 12px; padding: 12px; border-radius: 12px; background: #fff4d8; }
+.familyTips ol { margin: 6px 0 0; padding-left: 22px; }
+.adventureNote { display: block; width: min(940px, 100%); margin: 0 auto; color: #496146; font-size: 13px; text-align: center; }
+.adventureAccessibility { display: flex; align-items: center; gap: 9px; padding: 12px 16px; border-radius: 14px; background: rgba(255,255,255,.72); color: #475f43; font-weight: 900; }
+.adventureAccessibility button { margin-left: auto; padding: 7px 12px; border: 1px solid #b8d5a5; border-radius: 10px; background: #fff; color: #365534; font-weight: 900; cursor: pointer; }
+
+.listenFirstCard { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; margin: 14px 0; padding: 14px; border: 2px solid #a9cdb5; border-radius: 15px; background: #eff9e8; color: #345b37; }
+.listenFirstCard > div { display: grid; gap: 3px; }
+.listenFirstCard > div span { font-size: 13px; line-height: 1.4; }
+.listenFirstCard button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 8px 11px; border: 0; border-radius: 11px; background: #167da5; color: #fff; font-weight: 900; cursor: pointer; }
+.listenFirstCard button:last-child { background: #e5edd8; color: #35523a; }
+.listenFirstCard button:disabled { opacity: .6; cursor: wait; }
+
+.privacyNote { display: grid; gap: 4px; padding: 13px; border: 1px solid #c5dbb6; border-radius: 12px; background: #f2f9ec; color: #40563b; line-height: 1.45; }
+.privacyNote span { font-size: 13px; }
+.reducedMotion *, .reducedMotion *::before, .reducedMotion *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+.largeText { font-size: 1.12em; }
+.largeText .exampleChip, .largeText .switchRow, .largeText .diagnosticIntro { font-size: 1.12em; }
+
+@media (max-width: 700px) {
+  .adventureScreen { min-height: 100svh; max-height: 100svh; padding: 76px 12px 24px; }
+  .adventureScreen > .back { top: 14px; left: 12px; }
+  .adventureHero { padding: 16px; border-radius: 19px; }
+  .adventureHeroIcon { font-size: 48px; }
+  .adventureHero p { max-width: 270px; font-size: 13px; line-height: 1.4; }
+  .adventureCard { padding: 15px 12px; border-radius: 16px; }
+  .adventureSectionTitle > span { width: 38px; height: 38px; flex-basis: 38px; font-size: 21px; }
+  .adventureSectionTitle h2 { font-size: 19px; }
+  .adventureSectionTitle p { font-size: 12px; line-height: 1.35; }
+  .missionFooter { align-items: flex-start; flex-direction: column; }
+  .listenFirstCard { grid-template-columns: auto 1fr; }
+  .listenFirstCard button { grid-column: span 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adventureScreen *, .adventureScreen *::before, .adventureScreen *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

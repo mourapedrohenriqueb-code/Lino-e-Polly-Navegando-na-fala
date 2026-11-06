@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mourapedrohenriqueb-code.github.io/Lino-e-Polly-Navegando-na-fala/sitemap.xml
