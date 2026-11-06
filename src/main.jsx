@@ -29,6 +29,7 @@ const shopItems = [
 
 const assetUrl=(name)=>`${import.meta.env.BASE_URL}assets/${name}`;
 const profileStorageKey='fonoPirataProfile';
+const pixPaymentsEnabled=import.meta.env.VITE_PIX_ENABLED==='true';
 
 function loadSavedProfile(){
  try{
@@ -181,6 +182,7 @@ function App(){
  const [coins,setCoins]=useState(savedProfile?.coins ?? 80);
  const [completed,setCompleted]=useState(hasCompletedExampleProgress ? savedProfile.completed ?? getInitialProgress() : getInitialProgress());
  const [completedExamples,setCompletedExamples]=useState(savedProfile?.completedExamples && typeof savedProfile.completedExamples==='object' && !Array.isArray(savedProfile.completedExamples) ? savedProfile.completedExamples : {});
+ const [paidItems,setPaidItems]=useState([]);
  const [startingIslandId,setStartingIslandId]=useState(savedProfile?.startingIslandId ?? 1);
  const [totalAttempts,setTotalAttempts]=useState(savedProfile?.totalAttempts ?? 0);
  const [totalCorrect,setTotalCorrect]=useState(savedProfile?.totalCorrect ?? 0);
@@ -227,6 +229,10 @@ function App(){
  const activeExampleIndex=Math.min(selectedExampleIndex,selectedIsland.examples.length-1);
  const selectedExample = selectedIsland.examples[activeExampleIndex] ?? selectedIsland.answer;
  const selectedLetters = selectedExample.replace(/\s+/g,' e ');
+ const effectiveOwnedItems=useMemo(
+   ()=>[...new Set([...ownedItems,...paidItems])],
+   [ownedItems,paidItems]
+ );
 
  useEffect(()=>{
    if(['diagnostic','diagnostic-result','home','lesson'].includes(screen)){
@@ -322,6 +328,34 @@ function App(){
  },[language]);
 
  useEffect(()=>{
+   if(!supabaseClient || !currentUser || !syncReady || !pixPaymentsEnabled) return undefined;
+   let active=true;
+   const refreshPaidItems=async()=>{
+     const {data,error}=await supabaseClient.from('store_purchases')
+     .select('item_id')
+     .eq('user_id',currentUser.id)
+     .eq('status','approved');
+     if(!active) return;
+     if(error){
+       console.error('Não foi possível carregar as compras Pix.',error);
+       setAuthMessage('Não foi possível carregar as ferramentas compradas por Pix.');
+       return;
+     }
+     const purchasedItems=[...new Set(data.map((purchase)=>purchase.item_id))];
+     setPaidItems((current)=>current.length===purchasedItems.length
+       && current.every((item)=>purchasedItems.includes(item))
+       ? current
+       : purchasedItems);
+   };
+   void refreshPaidItems();
+   const timer=window.setInterval(()=>{void refreshPaidItems();},10000);
+   return ()=>{
+     active=false;
+     window.clearInterval(timer);
+   };
+ },[currentUser,syncReady]);
+
+ useEffect(()=>{
    if(!supabaseClient) return undefined;
    let active=true;
 
@@ -371,6 +405,7 @@ function App(){
        setCompleted(hasSavedExampleProgress ? saved.completed : getInitialProgress());
        setCompletedExamples(saved.completedExamples ?? {});
        setStartingIslandId(saved.startingIslandId ?? 1);
+       setPaidItems([]);
        setOwnedItems(saved.ownedItems);
        setTotalAttempts(saved.totalAttempts ?? 0);
        setTotalCorrect(saved.totalCorrect ?? 0);
@@ -395,10 +430,12 @@ function App(){
    const {data:{subscription}}=supabaseClient.auth.onAuthStateChange((event,session)=>{
      setCurrentUser(session?.user ?? null);
      if(session?.user){
-       window.setTimeout(()=>{ void loadCloudProfile(session.user.id); },0);
+      setPaidItems([]);
+      window.setTimeout(()=>{ void loadCloudProfile(session.user.id); },0);
      }else{
-       setSyncReady(false);
-       setSyncStatus('local');
+      setPaidItems([]);
+      setSyncReady(false);
+      setSyncStatus('local');
      }
    });
    supabaseClient.auth.getSession().then(({data,error})=>{
@@ -613,7 +650,7 @@ function App(){
    const speakNext=()=>{
      const utterance = new SpeechSynthesisUtterance(text);
      utterance.lang = language;
-     utterance.rate = ownedItems.includes('slow-voice') ? 0.68 : 0.88;
+     utterance.rate = effectiveOwnedItems.includes('slow-voice') ? 0.68 : 0.88;
      utterance.pitch = 1.02;
      if(portugueseVoice) utterance.voice=portugueseVoice;
      utterance.onstart = () => setSpeaking(true);
@@ -865,7 +902,7 @@ function App(){
  const globalStatus=screen==='account'?'':screen==='settings'?authMessage:authMessage||languageMessage;
 
  const buyItem=(item)=>{
-   if(ownedItems.includes(item.id)){
+   if(effectiveOwnedItems.includes(item.id)){
      return {success:false,message:`${item.name} já está no seu inventário.`};
    }
    if(coins < item.price){
@@ -874,6 +911,41 @@ function App(){
    setCoins((value)=>value - item.price);
    setOwnedItems((items)=>[...items,item.id]);
    return {success:true,message:`${item.name} comprado! A ajuda já está disponível nas atividades.`};
+ };
+
+ const createPixPayment=async(itemId,payerEmail)=>{
+   if(!supabaseClient || !currentUser) throw new Error('Entre na sua conta para comprar com Pix.');
+   const {data,error}=await supabaseClient.functions.invoke('create-pix-payment',{
+     body:{itemId,payerEmail}
+   });
+   if(error){
+     console.error('Não foi possível iniciar o pagamento Pix.',error);
+     throw new Error('Não foi possível iniciar o Pix. Tente novamente ou use suas moedas.');
+   }
+   if(!data || typeof data.purchaseId!=='string' || typeof data.qrCode!=='string'
+     || typeof data.qrCodeBase64!=='string' || typeof data.itemId!=='string'){
+     throw new Error(data?.error || 'O Mercado Pago devolveu dados incompletos.');
+   }
+   return data;
+ };
+
+ const checkPixPayment=async(purchaseId)=>{
+   if(!supabaseClient || !currentUser) throw new Error('Entre na sua conta para consultar o pagamento.');
+   const {data,error}=await supabaseClient.from('store_purchases')
+     .select('status,item_id')
+     .eq('id',purchaseId)
+     .eq('user_id',currentUser.id)
+     .single();
+   if(error){
+     console.error('Não foi possível consultar o pagamento Pix.',error);
+     throw new Error('Não foi possível confirmar o pagamento agora.');
+   }
+   return data;
+ };
+
+ const confirmPaidItem=(itemId)=>{
+   if(!shopItems.some((item)=>item.id===itemId)) throw new Error('A compra retornou uma ferramenta inválida.');
+   setPaidItems((current)=>[...new Set([...current,itemId])]);
  };
 
  const toggleReviewItem=(itemKey)=>{
@@ -1062,7 +1134,7 @@ function App(){
           lessonMode={lessonMode}
           onStartPractice={() => setLessonMode('standard')}
          listen={handleVoiceInput}
-         ownedItems={ownedItems}
+         ownedItems={effectiveOwnedItems}
          isSavedReview={reviewItems.includes(`${selectedIsland.id}:${activeExampleIndex}`)}
          onToggleReview={()=>toggleReviewItem(`${selectedIsland.id}:${activeExampleIndex}`)}
          promptTranslating={promptTranslating}
@@ -1095,9 +1167,9 @@ function App(){
         />
       )}
 
-      {screen === 'progress' && <Progress xp={xp} completed={completed} completedExamples={completedExamples} coins={coins} islands={islands} totalAttempts={totalAttempts} totalCorrect={totalCorrect} practiceByIsland={practiceByIsland} reviewItems={reviewItems} hasReviewBook={ownedItems.includes('review-book')} onOpenReview={openReviewItem} onRemoveReview={toggleReviewItem} onBack={() => setScreen('home')} />}
+      {screen === 'progress' && <Progress xp={xp} completed={completed} completedExamples={completedExamples} coins={coins} islands={islands} totalAttempts={totalAttempts} totalCorrect={totalCorrect} practiceByIsland={practiceByIsland} reviewItems={reviewItems} hasReviewBook={effectiveOwnedItems.includes('review-book')} onOpenReview={openReviewItem} onRemoveReview={toggleReviewItem} onBack={() => setScreen('home')} />}
 
-      {screen === 'shop' && <Shop onBack={() => setScreen('home')} coins={coins} items={shopItems} ownedItems={ownedItems} onBuy={buyItem} />}
+      {screen === 'shop' && <Shop onBack={() => setScreen('home')} coins={coins} items={shopItems} ownedItems={effectiveOwnedItems} onBuy={buyItem} user={currentUser} pixEnabled={pixPaymentsEnabled} onCreatePixPayment={createPixPayment} onCheckPixPayment={checkPixPayment} onPaymentApproved={confirmPaidItem} />}
 
      {screen === 'donation' && <Donation onBack={() => setScreen('home')} />}
 
@@ -1362,15 +1434,84 @@ function Progress({xp,completed,completedExamples,coins,islands,totalAttempts,to
  );
 }
 
-function Shop({onBack,coins,items,ownedItems,onBuy})
+function Shop({onBack,coins,items,ownedItems,onBuy,user,pixEnabled,onCreatePixPayment,onCheckPixPayment,onPaymentApproved})
 {
  const [notice,setNotice]=useState('');
  const [filter,setFilter]=useState('Todos');
+ const [payerEmail,setPayerEmail]=useState(user?.email ?? '');
+ const [paymentBusyItem,setPaymentBusyItem]=useState('');
+ const [pixPayment,setPixPayment]=useState(null);
+ const [pixDialogOpen,setPixDialogOpen]=useState(false);
+ const [paymentStatusMessage,setPaymentStatusMessage]=useState('');
+ const qrCanvasRef=useRef(null);
  const categories=['Todos',...new Set(items.map((item)=>item.category))];
  const visibleItems=filter==='Todos'?items:items.filter((item)=>item.category===filter);
  const handleBuy=(item)=>{
    const result=onBuy(item);
    setNotice(result.message);
+ };
+
+ useEffect(()=>{
+   if(pixPayment && pixDialogOpen && qrCanvasRef.current){
+     QRCode.toCanvas(qrCanvasRef.current,pixPayment.qrCode,{width:224,margin:2,color:{dark:'#243b35',light:'#ffffff'}})
+       .catch((error)=>{
+         console.error('Não foi possível gerar o QR Pix.',error);
+         setNotice('Não foi possível exibir o QR. Copie o código Pix para continuar.');
+       });
+   }
+ },[pixPayment,pixDialogOpen]);
+
+ useEffect(()=>{
+   if(!pixPayment) return undefined;
+   let active=true;
+   const checkStatus=async()=>{
+     try{
+       const purchase=await onCheckPixPayment(pixPayment.purchaseId);
+       if(!active) return;
+       if(purchase.status==='approved'){
+         onPaymentApproved(purchase.item_id);
+         setNotice('Pagamento confirmado! A ferramenta já está liberada na sua conta.');
+         setPixPayment(null);
+         setPixDialogOpen(false);
+       }else if(['rejected','cancelled'].includes(purchase.status)){
+         setNotice('Este pagamento não foi aprovado. Você pode tentar novamente.');
+         setPixPayment(null);
+         setPixDialogOpen(false);
+       }
+     }catch(error){
+       if(!active) return;
+       console.error('Falha ao verificar o status do Pix.',error);
+       setPaymentStatusMessage(error.message || 'Não foi possível confirmar o pagamento agora. Vamos tentar novamente.');
+     }
+   };
+   const timer=window.setInterval(()=>{void checkStatus();},4000);
+   return ()=>{
+     active=false;
+     window.clearInterval(timer);
+   };
+ },[pixPayment,onCheckPixPayment,onPaymentApproved]);
+
+ const handlePixPurchase=async(item)=>{
+   if(!user){
+     setNotice('Entre na sua conta para comprar e receber a ferramenta em outros dispositivos.');
+     return;
+   }
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail.trim())){
+     setNotice('Informe um e-mail válido para identificar o pagamento.');
+     return;
+   }
+   setPaymentBusyItem(item.id);
+   setNotice('');
+   setPaymentStatusMessage('');
+   try{
+     setPixPayment(await onCreatePixPayment(item.id,payerEmail.trim()));
+     setPixDialogOpen(true);
+   }catch(error){
+     console.error('Não foi possível iniciar a compra Pix.',error);
+     setNotice(error.message || 'Não foi possível iniciar o Pix.');
+   }finally{
+     setPaymentBusyItem('');
+   }
  };
 
  return (
@@ -1384,10 +1525,15 @@ function Shop({onBack,coins,items,ownedItems,onBuy})
        </header>
        <div className="coinTip"><Star size={19} fill="currentColor" /><span><strong>Como ganhar moedas?</strong> Cada fala reconhecida rende 15 moedas e 30 XP. Continue praticando para desbloquear mais ferramentas!</span></div>
        <div className="shopIntro"><div><h2>Escolha sua ajuda de aprendizagem</h2><p>As ferramentas compradas ficam disponíveis nas atividades e no seu progresso.</p></div><span>{ownedItems.filter((id)=>items.some((item)=>item.id===id)).length} no inventário</span></div>
+       {pixEnabled&&<div className="pixPurchaseInfo">
+         <label htmlFor="pix-payer-email">E-mail para identificar o pagamento Pix</label>
+         <input id="pix-payer-email" type="email" autoComplete="email" value={payerEmail} onChange={(event)=>setPayerEmail(event.target.value)} placeholder="seu@email.com" maxLength={254} required />
+         <p>Pix pelo Mercado Pago. Cada ferramenta custa R$ 2,99 e só é liberada após a confirmação do pagamento.</p>
+       </div>}
        <div className="shopFilters" aria-label="Filtrar ferramentas">
          {categories.map((category)=><button type="button" key={category} className={filter===category?'active':''} onClick={()=>setFilter(category)}>{category}</button>)}
        </div>
-       {notice&&<div className="shopNotice" role="status"><Check size={18}/>{notice}<button type="button" onClick={()=>setNotice('')} aria-label="Fechar aviso">×</button></div>}
+       {notice&&<div className="shopNotice" role="status"><Check size={18}/>{notice}{pixPayment&&!pixDialogOpen&&<button type="button" onClick={()=>setPixDialogOpen(true)}>Ver QR Pix</button>}<button type="button" onClick={()=>setNotice('')} aria-label="Fechar aviso">×</button></div>}
        <div className="shopGrid">
          {visibleItems.map((item)=>{
            const owned=ownedItems.includes(item.id);
@@ -1398,12 +1544,38 @@ function Shop({onBack,coins,items,ownedItems,onBuy})
                <h3>{item.name}</h3><p>{item.description}</p>
                <div className="shopBenefit"><Target size={16}/><span>{item.benefit}</span></div>
                <small className="shopHow">{item.action}</small>
-               <footer><strong>🪙 {item.price}</strong><button type="button" onClick={()=>handleBuy(item)} disabled={owned||!affordable}>{owned?'No inventário':affordable?'Comprar':`Faltam ${item.price-coins}`}</button></footer>
+               <footer className="shopCardActions">
+                 <button type="button" className="coinPurchase" onClick={()=>handleBuy(item)} disabled={owned||!affordable}>{owned?'No inventário':`🪙 ${item.price}`}</button>
+                 {pixEnabled&&<button type="button" className="pixPurchase" onClick={()=>void handlePixPurchase(item)} disabled={owned||paymentBusyItem===item.id||!user}>
+                   {owned?'Liberado':paymentBusyItem===item.id?'Criando Pix...':user?'Pix R$ 2,99':'Entre para comprar'}
+                 </button>}
+               </footer>
              </article>
            );
          })}
        </div>
      </div>
+     {pixPayment&&pixDialogOpen&&<div className="pixDialogBackdrop">
+       <section className="pixDialog" role="dialog" aria-modal="true" aria-labelledby="pix-dialog-title">
+         <button type="button" className="pixDialogClose" aria-label="Fechar pagamento Pix" onClick={()=>{setPixDialogOpen(false);setNotice('Pagamento Pix continua aguardando confirmação.');}}>×</button>
+         <span className="shopEyebrow">PAGAMENTO SEGURO</span>
+         <h2 id="pix-dialog-title">Pague R$ 2,99 com Pix</h2>
+         <p>Escaneie o QR pelo aplicativo do seu banco. A ferramenta será liberada automaticamente quando o Mercado Pago confirmar o pagamento.</p>
+         <canvas ref={qrCanvasRef} aria-label="QR Code Pix para pagamento" />
+         <label htmlFor="pix-copy-paste">Ou copie e cole o código Pix</label>
+         <textarea id="pix-copy-paste" readOnly value={pixPayment.qrCode} onFocus={(event)=>event.currentTarget.select()} />
+         <button type="button" className="pixCopyButton" onClick={async()=>{
+           try{
+             await copyTextToClipboard(pixPayment.qrCode);
+             setNotice('Código Pix copiado.');
+           }catch(error){
+             console.error('Não foi possível copiar o código Pix.',error);
+             setNotice('Não foi possível copiar o código Pix.');
+           }
+         }}><Copy size={17} /> Copiar código Pix</button>
+         <p role="status">{paymentStatusMessage||'Aguardando confirmação do pagamento...'}</p>
+       </section>
+     </div>}
    </div>
  );
 }

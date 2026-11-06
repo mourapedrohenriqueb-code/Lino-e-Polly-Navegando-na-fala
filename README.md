@@ -53,6 +53,16 @@ npm run test
    ```
 
 5. Para o GitHub Pages, cadastre `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` como Actions secrets do repositório. A chave do Google fica somente nos secrets da função Supabase, nunca nos secrets do frontend.
+6. Para ativar compras Pix de R$ 2,99 por ferramenta, crie e configure uma aplicação de vendedor no Mercado Pago e registre uma chave Pix nessa conta. Configure o webhook para eventos de pagamento com a URL `https://SEU_PROJECT_REF.supabase.co/functions/v1/mercadopago-webhook` e copie o segredo de assinatura do Mercado Pago. Em seguida, aplique a migração e publique as funções:
+
+   ```sh
+   npx supabase db push
+   npx supabase secrets set MP_ACCESS_TOKEN=SEU_ACCESS_TOKEN MP_WEBHOOK_SECRET=SEU_SEGREDO_DO_WEBHOOK
+   npx supabase functions deploy create-pix-payment
+   npx supabase functions deploy mercadopago-webhook --no-verify-jwt
+   ```
+
+   Guarde `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` apenas nos secrets do Supabase. Depois de testar um pagamento no ambiente de teste do Mercado Pago, cadastre `VITE_PIX_ENABLED=true` como GitHub Actions secret e publique novamente para mostrar a opção Pix na loja. A ferramenta só é liberada depois que o webhook valida a assinatura e confirma o pagamento aprovado no Mercado Pago; a chave Pix exibida na tela de doação permanece separada.
 
 O banco aplica políticas RLS para que cada pessoa leia e altere apenas o próprio progresso. A tradução exige login e tem limite de 30 solicitações por conta/dia. Google Cloud Translation pode gerar custos; configure alertas e limites de uso no Google Cloud.
 
