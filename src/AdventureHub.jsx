@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, BookOpen, Check, Compass, Headphones, Heart, Lightbulb, Sparkles, Volume2 } from 'lucide-react';
-import { dailyMissionGoal, getStoryChapter } from './adventure';
+import { dailyMissionGoal, getStoryChapter, rotateItems } from './adventure';
 import './adventure.css';
 
 const storyChapters = [
@@ -36,6 +36,7 @@ function RhymeGame({ onSpeak }) {
   const [round, setRound] = useState(0);
   const [result, setResult] = useState('');
   const challenge = rhymeChallenges[round % rhymeChallenges.length];
+  const options = rotateItems(challenge.options, round);
 
   const chooseAnswer = (answer) => {
     setResult(answer === challenge.answer
@@ -51,7 +52,7 @@ function RhymeGame({ onSpeak }) {
         <button type="button" onClick={() => onSpeak(challenge.word)} aria-label={`Ouvir ${challenge.word}`}><Volume2 /></button>
       </div>
       <div className="rhymeChoices">
-        {challenge.options.map((option) => (
+        {options.map((option) => (
           <button type="button" key={option} onClick={() => chooseAnswer(option)}>{option}</button>
         ))}
       </div>
@@ -62,9 +63,11 @@ function RhymeGame({ onSpeak }) {
 }
 
 function MemoryGame() {
+  const [round, setRound] = useState(0);
   const [selectedWord, setSelectedWord] = useState(null);
   const [matchedWords, setMatchedWords] = useState([]);
   const [result, setResult] = useState('');
+  const picturePairs = rotateItems(memoryPairs, (round % (memoryPairs.length - 1)) + 1);
 
   const chooseIcon = (pair) => {
     if (!selectedWord) {
@@ -92,7 +95,7 @@ function MemoryGame() {
           ))}
         </div>
         <div className="memoryColumn" aria-label="Figuras">
-          {memoryPairs.map((pair) => (
+          {picturePairs.map((pair) => (
             <button type="button" key={pair.icon} className={matchedWords.includes(pair.word) ? 'matched' : ''} onClick={() => chooseIcon(pair)} disabled={matchedWords.includes(pair.word)} aria-label={`Figura ${pair.word}`}>
               {matchedWords.includes(pair.word) ? <Check size={18} /> : pair.icon}
             </button>
@@ -100,7 +103,7 @@ function MemoryGame() {
         </div>
       </div>
       {result && <p className="gameFeedback" role="status">{result}</p>}
-      {matchedWords.length === memoryPairs.length && <p className="gameComplete">Você encontrou todos os pares! Quer jogar de novo? <button type="button" onClick={() => { setMatchedWords([]); setResult(''); }}>Recomeçar</button></p>}
+      {matchedWords.length === memoryPairs.length && <p className="gameComplete">Você encontrou todos os pares! Quer jogar de novo? <button type="button" onClick={() => { setRound((value) => value + 1); setMatchedWords([]); setSelectedWord(null); setResult(''); }}>Recomeçar</button></p>}
     </section>
   );
 }

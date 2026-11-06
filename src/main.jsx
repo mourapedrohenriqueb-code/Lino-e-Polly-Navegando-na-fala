@@ -634,6 +634,10 @@ function App(){
          setMessage(`Complete primeiro o exemplo ${nextRequiredIndex+1} para liberar o próximo.`);
          return;
        }
+       if(completedForIsland.includes(activeExampleIndex)){
+         setMessage('Este exemplo já foi concluído. Repetir a prática não gera moedas ou XP extras.');
+         return;
+       }
        setTotalCorrect((value)=>value+1);
        setXp((value)=>value + 30);
        setCoins((value)=>value + 15);
@@ -1106,7 +1110,7 @@ function Lesson({island,selectedExample,selectedExampleIndex,nextRequiredExample
          </div>
          <p>
            {island.type === 'livros'
-             ? 'Escolha um livro para abrir a biblioteca digital e ler no site de origem.'
+             ? 'Fale o título do livro para praticar. Se quiser, abra a biblioteca digital para ler a obra.'
              : island.type === 'letra'
                ? `Fale somente a letra ${selectedExample}. Quando ela for reconhecida, a próxima letra aparece automaticamente.`
                : 'Escute o exemplo e depois fale no microfone com calma. O reconhecimento automático pode variar conforme o aparelho e o ambiente.'}
@@ -1178,12 +1182,10 @@ function Lesson({island,selectedExample,selectedExampleIndex,nextRequiredExample
              <p>Os links levam às obras originais, principalmente em inglês, que estão em domínio público. Traduções podem ter direitos autorais próprios; confira a edição no site de origem.</p>
            </div>
          )}
-         {!island.books && (
-           <button type="button" className="mic" onClick={listen} disabled={listening}>
-             <Mic size={42} />
-             <span>{promptTranslating ? 'Traduzindo...' : listening ? 'Ouvindo...' : island.type==='letra'?'Falar a letra':'Falar exemplo'}</span>
-           </button>
-         )}
+         <button type="button" className="mic" onClick={listen} disabled={listening}>
+           <Mic size={42} />
+           <span>{promptTranslating ? 'Traduzindo...' : listening ? 'Ouvindo...' : island.type==='letra'?'Falar a letra':island.type==='livros'?'Falar título do livro':'Falar exemplo'}</span>
+         </button>
          {message && (
            <div className={`feedback ${message.includes('Muito bem') ? 'ok' : 'try'}`}>
              {message}

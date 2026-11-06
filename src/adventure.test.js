@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { dailyMissionGoal, getDailyMission, getStoryChapter, recordDailyAttempt } from './adventure';
+import { dailyMissionGoal, getDailyMission, getStoryChapter, recordDailyAttempt, rotateItems } from './adventure';
 
 describe('extras da aventura', () => {
   test('reinicia a missão diária quando muda o dia local', () => {
@@ -23,5 +23,17 @@ describe('extras da aventura', () => {
     expect(getStoryChapter(0)).toBe(1);
     expect(getStoryChapter(2)).toBe(3);
     expect(getStoryChapter(8)).toBe(6);
+  });
+
+  test('alterna a posição das respostas e embaralha a coluna de figuras', () => {
+    const options = ['PATO', 'BOLA', 'CASA'];
+    const pairs = [{ word: 'CASA' }, { word: 'SOL' }, { word: 'GATO' }, { word: 'BOLA' }];
+
+    expect(rotateItems(options, 0)).toEqual(options);
+    expect(rotateItems(options, 1)).toEqual(['BOLA', 'CASA', 'PATO']);
+    expect(rotateItems(options, -1)).toEqual(['CASA', 'PATO', 'BOLA']);
+    expect(new Set([0, 1, 2].map((round) => rotateItems(options, round).indexOf('PATO'))).size).toBe(3);
+    expect(rotateItems([], 1)).toEqual([]);
+    expect(rotateItems(pairs, 1).map((pair) => pair.word).every((word, index) => word !== pairs[index].word)).toBe(true);
   });
 });

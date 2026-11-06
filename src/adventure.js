@@ -1,5 +1,11 @@
 export const dailyMissionGoal = 3;
 
+export function rotateItems(items, offset = 0) {
+  if (!items.length) return [];
+  const start = ((offset % items.length) + items.length) % items.length;
+  return [...items.slice(start), ...items.slice(0, start)];
+}
+
 export function getDailyMission(savedMission, date = new Date()) {
   const dateKey = [
     date.getFullYear(),
