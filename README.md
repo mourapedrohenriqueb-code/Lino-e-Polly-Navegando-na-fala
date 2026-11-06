@@ -6,7 +6,7 @@ Jogo educativo de fala com mapa de ilhas, atividades de pronúncia e os mascotes
 
 - Seis ilhas: alfabeto, sílabas frequentes, palavras, frases, textos e livros infantis.
 - Os bancos incluem mais de 300 palavras, mais de 400 frases e 500 textos distintos.
-- O questionário tem 20 perguntas de observação para sugerir uma atividade inicial. Ele não fornece diagnóstico e não substitui uma avaliação fonoaudiológica.
+- O questionário tem 20 perguntas de observação para sugerir uma ilha inicial; a sugestão libera esse ponto de partida. Ele não fornece diagnóstico e não substitui uma avaliação fonoaudiológica.
 - Sem configuração externa, o progresso é salvo neste navegador e neste dispositivo. Com Supabase configurado, é possível entrar por link de e-mail ou código SMS e sincronizar o progresso.
 - A voz e o reconhecimento dependem dos recursos e das vozes disponíveis no navegador. O reconhecimento de fala pode variar por aparelho, microfone e ambiente.
 - Os livros abrem em bibliotecas digitais externas. Os links levam a obras originais em domínio público, principalmente em inglês; traduções podem ter direitos autorais próprios.
@@ -14,8 +14,9 @@ Jogo educativo de fala com mapa de ilhas, atividades de pronúncia e os mascotes
 - Cada exemplo reconhecido rende 30 XP e 15 moedas. A loja troca moedas por ferramentas de prática: divisão silábica, voz mais lenta, pista da letra inicial, repetição do modelo, rodada de foco e caderno de revisão. As ferramentas compradas são salvas junto ao progresso.
 - A tela de progresso resume tentativas, reconhecimentos, precisão, atividade por ilha, conquistas e exemplos guardados para rever. Esses dados descrevem o uso do jogo e não são uma avaliação clínica.
 - A área **Aventura** acrescenta capítulos opcionais, missão diária sem penalidade, personalização visual, jogos de rimas e memória, modo para ouvir primeiro, orientações para cuidadores e controles de acessibilidade.
-- As ilhas são feitas em sequência: cada letra ou exemplo precisa ser reconhecido para avançar, e a próxima ilha só é liberada quando todos os exemplos da ilha atual forem concluídos.
-- Para letras isoladas, o reconhecimento aceita a letra e alguns nomes falados em português, como “bê” e “cê”. O funcionamento depende do reconhecimento de voz disponível no navegador e no aparelho.
+- A Ilha do Alfabeto apresenta as 26 letras em 13 pares consecutivos. O progresso antigo de letras individuais é convertido para os pares correspondentes ao abrir o jogo.
+- Cada exemplo precisa ser reconhecido para avançar; depois de iniciar pela ilha sugerida, a próxima ilha é liberada quando todos os exemplos da ilha atual forem concluídos.
+- Para letras e pares, o reconhecimento aceita letras e alguns nomes falados em português, como “bê” e “cê”, na ordem apresentada. O funcionamento depende do reconhecimento de voz disponível no navegador e no aparelho.
 
 ## Acessar o aplicativo
 

@@ -1,6 +1,65 @@
 const unique = (items) => [...new Set(items)];
 
 export const alphabetLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+export const alphabetPairs = Array.from({ length: alphabetLetters.length / 2 }, (_, index) =>
+  alphabetLetters.slice(index * 2, index * 2 + 2).join(' ')
+);
+
+export function migrateAlphabetProgress(profile) {
+  if (!profile || profile.alphabetPairsVersion === 1) return profile;
+
+  const hasCompletedExamples = profile.completedExamples
+    && typeof profile.completedExamples === 'object'
+    && !Array.isArray(profile.completedExamples);
+  const completedExamples = hasCompletedExamples ? profile.completedExamples : {};
+  const completedLetters = Array.isArray(completedExamples[1]) ? completedExamples[1] : [];
+  const completedPairs = profile.completed >= 1
+    ? alphabetPairs.map((_, index) => index)
+    : alphabetPairs.reduce((pairs, _, index) => (
+      completedLetters.includes(index * 2) && completedLetters.includes(index * 2 + 1)
+        ? [...pairs, index]
+        : pairs
+    ), []);
+
+  return {
+    ...profile,
+    selectedExampleIndex: profile.selectedIslandId === 1
+      ? Math.floor((profile.selectedExampleIndex ?? 0) / 2)
+      : profile.selectedExampleIndex,
+    ...((hasCompletedExamples || profile.completed >= 1)
+      ? { completedExamples: { ...completedExamples, 1: completedPairs } }
+      : {}),
+    alphabetPairsVersion: 1
+  };
+}
+
+export function migrateSavedProgress(profile, islands) {
+  const migrated = migrateAlphabetProgress(profile);
+  if (!profile) return migrated;
+
+  let completedExamples = migrated.completedExamples;
+  if (profile.completedExamples === undefined
+    && Number.isInteger(profile.completed)
+    && profile.completed > 0) {
+    completedExamples = {};
+    for (const island of islands.slice(0, profile.completed)) {
+      completedExamples[island.id] = island.examples.map((_, index) => index);
+    }
+  }
+
+  if (completedExamples === undefined) return migrated;
+
+  const completed = getCompletedIslandCount(completedExamples, islands);
+  return { ...migrated, completed, completedExamples };
+}
+
+export function getResumeExampleIndex(selectedIndex, completedExamples, totalExamples) {
+  const isValidSelection = Number.isInteger(selectedIndex)
+    && selectedIndex >= 0
+    && selectedIndex < totalExamples;
+  if (isValidSelection) return selectedIndex;
+  return getFirstUncompletedExampleIndex(completedExamples, totalExamples) ?? 0;
+}
 
 const baseWordBank = [
   'casa', 'bola', 'mesa', 'boneca', 'pato', 'gato', 'sol', 'lua', 'flor', 'rio', 'livro', 'mãe', 'pai', 'filho', 'amigo', 'jardim',
@@ -420,11 +479,13 @@ export function getDiagnosticSummary(score) {
     'Ilha dos Livros'
   ];
 
+  const startingIslandTitle = islandNames[startingIslandId - 1];
   return {
     title: 'Sugestão para começar',
-    message: `Pelas respostas, sugerimos praticar conteúdos da ${islandNames[startingIslandId - 1]}. A aventura começa na Ilha do Alfabeto; cada próxima ilha será liberada depois de concluir todos os exemplos da ilha atual.`,
+    message: `Pelas respostas, sugerimos começar pela ${startingIslandTitle}. Esta sugestão ajuda a escolher uma atividade inicial e não é um diagnóstico.`,
     tone: startingIslandId <= 2 ? 'alerta' : startingIslandId <= 4 ? 'media' : 'excelente',
     startingIslandId,
+    startingIslandTitle,
     disclaimer: 'Isto não é um diagnóstico nem substitui uma avaliação fonoaudiológica. Se houver preocupação com a fala, audição ou comunicação, converse com um fonoaudiólogo ou pediatra.'
   };
 }
@@ -499,6 +560,22 @@ export function speechMatches(expectedText, spokenText, language = 'pt-BR') {
   const expected = normalize(expectedText).split(/\s+/).filter(Boolean);
   const spoken = normalize(spokenText).split(/\s+/).filter(Boolean);
   if (!expected.length || !spoken.length) return false;
+  if (expected.length === 2 && expected.every((letter) => /^[A-Z]$/.test(letter))) {
+    const fillers = new Set(['LETRA', 'LETRINHA', 'SOM']);
+    const spokenLetters = spoken.filter((word) => !fillers.has(word));
+    const matchesLetter = (expectedLetter, spokenLetter) =>
+      expectedLetter === spokenLetter
+      || (language.toLowerCase().startsWith('pt')
+        && (portugueseLetterNames[expectedLetter] ?? []).includes(spokenLetter));
+
+    return (spokenLetters.length === 2
+      && matchesLetter(expected[0], spokenLetters[0])
+      && matchesLetter(expected[1], spokenLetters[1]))
+      || (spokenLetters.length === 3
+        && spokenLetters[1] === 'E'
+        && matchesLetter(expected[0], spokenLetters[0])
+        && matchesLetter(expected[1], spokenLetters[2]));
+  }
   if (/^[A-Z]$/.test(normalize(expectedText))) {
     const fillers = new Set(['LETRA', 'LETRINHA', 'SOM']);
     const spokenLetter = spoken.filter((word) => !fillers.has(word));
@@ -535,9 +612,37 @@ export function isIslandUnlocked(islandId, completedCount) {
   return islandId === 1 || completedCount >= islandId - 1;
 }
 
-export function getUnlockedIslands(islands, completedCount) {
-  return islands.map((island) => ({
-    ...island,
-    unlocked: isIslandUnlocked(island.id, completedCount),
-  }));
+export function getUnlockedIslands(islands, completedCount, startingIslandId = 1, completedExamples) {
+  if (completedExamples === undefined) {
+    return islands.map((island) => ({
+      ...island,
+      unlocked: isIslandUnlocked(island.id, completedCount),
+    }));
+  }
+
+  return islands.map((island) => {
+    const isComplete = areAllExamplesComplete(
+      completedExamples?.[island.id],
+      island.examples?.length
+    );
+    const canContinueFromStartingIsland = island.id > startingIslandId
+      && islands
+        .filter((previousIsland) => previousIsland.id >= startingIslandId && previousIsland.id < island.id)
+        .every((previousIsland) => areAllExamplesComplete(
+          completedExamples?.[previousIsland.id],
+          previousIsland.examples?.length
+        ));
+
+    return {
+      ...island,
+      unlocked: isComplete || island.id === startingIslandId || canContinueFromStartingIsland
+    };
+  });
+}
+
+export function getCompletedIslandCount(completedExamples, islands) {
+  return islands.filter((island) => areAllExamplesComplete(
+    completedExamples?.[island.id],
+    island.examples.length
+  )).length;
 }
