@@ -523,7 +523,7 @@ export function areAllExamplesComplete(completedExamples, totalExamples) {
 
 const portugueseLetterNames = {
   A: ['A', 'AH'],
-  B: ['BE', 'BEH'],
+  B: ['BE', 'BEH', 'BEBE'],
   C: ['CE', 'SE'],
   D: ['DE'],
   E: ['E', 'EH'],
@@ -574,7 +574,9 @@ export function speechMatches(expectedText, spokenText, language = 'pt-BR') {
       || (spokenLetters.length === 3
         && spokenLetters[1] === 'E'
         && matchesLetter(expected[0], spokenLetters[0])
-        && matchesLetter(expected[1], spokenLetters[2]));
+        && matchesLetter(expected[1], spokenLetters[2]))
+      || (spokenLetters.length === 1
+        && spokenLetters[0] === expected.join(''));
   }
   if (/^[A-Z]$/.test(normalize(expectedText))) {
     const fillers = new Set(['LETRA', 'LETRINHA', 'SOM']);

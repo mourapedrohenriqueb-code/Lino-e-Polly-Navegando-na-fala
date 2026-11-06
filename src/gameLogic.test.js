@@ -124,6 +124,7 @@ describe('progresso dos exemplos', () => {
 
   test('reconhece o nome falado de uma letra isolada em português', () => {
     expect(speechMatches('B', 'bê')).toBe(true);
+    expect(speechMatches('B', 'bebê')).toBe(true);
     expect(speechMatches('C', 'cê')).toBe(true);
     expect(speechMatches('H', 'agá')).toBe(true);
     expect(speechMatches('X', 'xis')).toBe(true);
@@ -139,9 +140,12 @@ describe('progresso dos exemplos', () => {
   test('reconhece somente o par de letras solicitado, na ordem correta', () => {
     expect(speechMatches('A B', 'A B')).toBe(true);
     expect(speechMatches('A B', 'a bê')).toBe(true);
+    expect(speechMatches('A B', 'a bebê')).toBe(true);
     expect(speechMatches('A B', 'letra a e letra bê')).toBe(true);
+    expect(speechMatches('A B', 'AB')).toBe(true);
     expect(speechMatches('A B', 'bê a')).toBe(false);
     expect(speechMatches('A B', 'a bê cê')).toBe(false);
+    expect(speechMatches('A B', 'a bebeu')).toBe(false);
   });
 
   test('a ilha seguinte só libera quando todas as atividades da ilha atual acabam', () => {

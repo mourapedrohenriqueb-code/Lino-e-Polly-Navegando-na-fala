@@ -711,7 +711,16 @@ function App(){
 
    recognition.onerror = (event) => {
      setListening(false);
-     setMessage(`Não consegui ouvir direito: ${event.error}. Tente outra vez.`);
+     const errorMessages={
+       'no-speech':'Não detectei nenhuma fala. Fale depois que o microfone começar a ouvir.',
+       'audio-capture':'Não encontrei um microfone. Confira se ele está conectado e funcionando.',
+       'not-allowed':'O acesso ao microfone foi bloqueado. Permita o uso do microfone nas configurações do navegador.',
+       'service-not-allowed':'O navegador bloqueou o serviço de reconhecimento de voz. Tente usar Chrome ou Edge.',
+       'language-not-supported':'O reconhecimento de voz não oferece suporte ao idioma selecionado.',
+       network:'O serviço de reconhecimento não conseguiu se conectar. Confira sua internet e tente novamente.',
+       aborted:'O reconhecimento de voz foi interrompido. Tente novamente.'
+     };
+     setMessage(errorMessages[event.error] ?? `Não consegui ouvir direito (${event.error}). Confira o microfone e tente outra vez.`);
    };
 
    recognition.onresult = (event) => {
