@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import {
   alphabetLetters,
+  addCompletedExample,
   getDiagnosticQuestions,
   getDiagnosticSummary,
+  getFirstUncompletedExampleIndex,
   getInitialProgress,
+  getNextUncompletedExampleIndex,
   getSyllableGuide,
   getUnlockedIslands,
   phraseBank,
   portugueseSyllables,
+  speechMatches,
   textBank,
   wordBank
 } from './gameLogic';
@@ -53,6 +57,26 @@ describe('sistema de ilhas', () => {
     const result = getUnlockedIslands(islands, 0, 3);
     expect(result.map((island) => island.unlocked)).toEqual([true, true, true]);
     expect(getInitialProgress()).toBe(0);
+  });
+});
+
+describe('progresso dos exemplos', () => {
+  test('registra cada exemplo sem duplicar índices', () => {
+    expect(addCompletedExample([0, 2], 2)).toEqual([0, 2]);
+    expect(addCompletedExample([0, 2], 1)).toEqual([0, 1, 2]);
+  });
+
+  test('avança para o próximo exemplo ainda não concluído', () => {
+    expect(getNextUncompletedExampleIndex([0, 1], 1, 4)).toBe(2);
+    expect(getNextUncompletedExampleIndex([0, 2, 3], 3, 4)).toBe(1);
+    expect(getNextUncompletedExampleIndex([0, 1], 1, 2)).toBeNull();
+    expect(getFirstUncompletedExampleIndex([0, 2], 4)).toBe(1);
+  });
+
+  test('exige a letra exata no exercício de alfabeto', () => {
+    expect(speechMatches('A', 'a')).toBe(true);
+    expect(speechMatches('A', 'B')).toBe(false);
+    expect(speechMatches('A', 'casa')).toBe(false);
   });
 });
 

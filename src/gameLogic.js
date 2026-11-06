@@ -433,6 +433,59 @@ export function getInitialProgress() {
   return 0;
 }
 
+export function addCompletedExample(completedExamples, exampleIndex) {
+  const completed = Array.isArray(completedExamples)
+    ? completedExamples.filter((index) => Number.isInteger(index) && index >= 0)
+    : [];
+  return [...new Set([...completed, exampleIndex])].sort((first, second) => first - second);
+}
+
+export function getNextUncompletedExampleIndex(completedExamples, currentIndex, totalExamples) {
+  if (!Number.isInteger(totalExamples) || totalExamples <= 0) return null;
+  const completed = new Set(Array.isArray(completedExamples) ? completedExamples : []);
+  for (let offset = 1; offset <= totalExamples; offset += 1) {
+    const index = (currentIndex + offset) % totalExamples;
+    if (!completed.has(index)) return index;
+  }
+  return null;
+}
+
+export function getFirstUncompletedExampleIndex(completedExamples, totalExamples) {
+  return getNextUncompletedExampleIndex(completedExamples, -1, totalExamples);
+}
+
+export function speechMatches(expectedText, spokenText) {
+  const normalize = (text = '') => text.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+  const expected = normalize(expectedText).split(/\s+/).filter(Boolean);
+  const spoken = normalize(spokenText).split(/\s+/).filter(Boolean);
+  if (!expected.length || !spoken.length) return false;
+  if (expected.length === 1 && spoken.length === 1) {
+    const distance = editDistance(expected[0], spoken[0]);
+    return expected[0].length === 1 ? distance === 0 : distance <= Math.max(1, Math.floor(expected[0].length * 0.2));
+  }
+  const matched = expected.filter((word) => spoken.some((spokenWord) => word === spokenWord || editDistance(word, spokenWord) <= 1)).length;
+  return matched / expected.length >= 0.82;
+}
+
+function editDistance(first, second) {
+  const row = Array.from({ length: second.length + 1 }, (_, index) => index);
+  for (let rowIndex = 1; rowIndex <= first.length; rowIndex += 1) {
+    let previous = row[0];
+    row[0] = rowIndex;
+    for (let column = 1; column <= second.length; column += 1) {
+      const oldValue = row[column];
+      row[column] = Math.min(row[column] + 1, row[column - 1] + 1, previous + (first[rowIndex - 1] === second[column - 1] ? 0 : 1));
+      previous = oldValue;
+    }
+  }
+  return row[second.length];
+}
+
 export function isIslandUnlocked(islandId, completedCount, startingIslandId = 1) {
   return islandId === 1 || islandId <= startingIslandId || completedCount >= islandId - 1;
 }

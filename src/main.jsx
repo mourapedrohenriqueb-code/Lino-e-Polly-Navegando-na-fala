@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Volume2,Mic,Star,Lock,ArrowLeft,Settings,Home,Check,BookOpen,Trophy,ShoppingBag,Speaker,BrainCircuit,Waves,Heart,Copy,Share2,ExternalLink,LogIn,LogOut,Languages,Target,Lightbulb,Headphones,Bookmark,Compass,AudioLines} from 'lucide-react';
 import QRCode from 'qrcode';
-import { alphabetLetters, bookRecommendations, getDiagnosticQuestions, getDiagnosticSummary, getInitialProgress, getSyllableGuide, getUnlockedIslands, phraseBank, portugueseSyllables, textBank, wordBank } from './gameLogic';
+import { addCompletedExample, alphabetLetters, bookRecommendations, getDiagnosticQuestions, getDiagnosticSummary, getFirstUncompletedExampleIndex, getInitialProgress, getNextUncompletedExampleIndex, getSyllableGuide, getUnlockedIslands, phraseBank, portugueseSyllables, speechMatches, textBank, wordBank } from './gameLogic';
 import { observeAndTranslate, translateTexts } from './services/autoTranslate';
 import { supabaseClient, supabaseConfigured, supabaseConfigurationMessage } from './services/supabaseClient';
 import './styles.css';
@@ -25,7 +25,6 @@ const shopItems = [
  {id:'focus-compass',name:'Bússola do foco',price:110,icon:'🧭',category:'Rotina',description:'Desbloqueia uma rodada guiada de três exemplos seguidos para praticar com foco.',benefit:'Organiza uma sessão curta de prática.',action:'Ferramenta disponível em cada atividade.'}
 ];
 
-const normalizeText=(text='')=>text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9\s]/g,' ').replace(/\s+/g,' ').trim().toUpperCase();
 const assetUrl=(name)=>`${import.meta.env.BASE_URL}assets/${name}`;
 const profileStorageKey='fonoPirataProfile';
 
@@ -63,6 +62,7 @@ function getValidProgress(value){
  if(value.totalAttempts!==undefined && (!Number.isInteger(value.totalAttempts) || value.totalAttempts<0)) return null;
  if(value.totalCorrect!==undefined && (!Number.isInteger(value.totalCorrect) || value.totalCorrect<0 || value.totalCorrect>(value.totalAttempts ?? 0))) return null;
  if(value.practiceByIsland!==undefined && (!value.practiceByIsland || typeof value.practiceByIsland!=='object' || Array.isArray(value.practiceByIsland) || Object.values(value.practiceByIsland).some((count)=>!Number.isInteger(count) || count<0))) return null;
+ if(value.completedExamples!==undefined && (!value.completedExamples || typeof value.completedExamples!=='object' || Array.isArray(value.completedExamples) || Object.entries(value.completedExamples).some(([islandId,indices])=>!/^([1-6])$/.test(islandId) || !Array.isArray(indices) || indices.some((index)=>!Number.isInteger(index) || index<0 || index>500) || new Set(indices).size!==indices.length))) return null;
  if(value.reviewItems!==undefined && (!Array.isArray(value.reviewItems) || !value.reviewItems.every((item)=>typeof item==='string' && /^\d+:\d+$/.test(item)))) return null;
  if(value.profileName!==undefined && (typeof value.profileName!=='string' || value.profileName.length>32)) return null;
  if(value.avatarData!==undefined && (typeof value.avatarData!=='string' || value.avatarData.length>150000 || !/^data:image\/jpeg;base64,/.test(value.avatarData))) return null;
@@ -95,32 +95,6 @@ function resizeProfileImage(file){
  });
 }
 
-function speechMatches(expectedText,spokenText){
- const expected=normalizeText(expectedText).split(/\s+/).filter(Boolean);
- const spoken=normalizeText(spokenText).split(/\s+/).filter(Boolean);
- if(!expected.length || !spoken.length) return false;
- if(expected.length===1 && spoken.length===1){
-   const distance=editDistance(expected[0],spoken[0]);
-   return distance <= Math.max(1,Math.floor(expected[0].length*0.2));
- }
- const matched=expected.filter((word)=>spoken.some((spokenWord)=>word===spokenWord || editDistance(word,spokenWord)<=1)).length;
- return matched/expected.length >= 0.82;
-}
-
-function editDistance(first,second){
- const row=Array.from({length:second.length+1},(_,index)=>index);
- for(let rowIndex=1;rowIndex<=first.length;rowIndex+=1){
-   let previous=row[0];
-   row[0]=rowIndex;
-   for(let column=1;column<=second.length;column+=1){
-     const oldValue=row[column];
-     row[column]=Math.min(row[column]+1,row[column-1]+1,previous+(first[rowIndex-1]===second[column-1]?0:1));
-     previous=oldValue;
-   }
- }
- return row[second.length];
-}
-
 const copyTextToClipboard=async(text)=>{
  try{
    if(navigator.clipboard?.writeText){
@@ -145,9 +119,10 @@ const copyTextToClipboard=async(text)=>{
 
 function App(){
  const [savedProfile]=useState(loadSavedProfile);
+ const hasCompletedExampleProgress=savedProfile?.completedExamples!==undefined;
  const [screen,setScreen]=useState(savedProfile?.screen==='lesson'?'lesson':savedProfile?'home':'diagnostic');
  const [isLoading,setIsLoading]=useState(true);
- const [selectedIslandId,setSelectedIslandId]=useState(savedProfile?.selectedIslandId ?? 1);
+ const [selectedIslandId,setSelectedIslandId]=useState(hasCompletedExampleProgress ? savedProfile?.selectedIslandId ?? 1 : Math.min(savedProfile?.selectedIslandId ?? 1,savedProfile?.startingIslandId ?? 1));
  const [selectedExampleIndex,setSelectedExampleIndex]=useState(savedProfile?.selectedExampleIndex ?? 0);
  const [xp,setXp]=useState(savedProfile?.xp ?? 120);
  const [profileName,setProfileName]=useState(typeof savedProfile?.profileName==='string'?savedProfile.profileName:'Pedro');
@@ -157,7 +132,8 @@ function App(){
  const [draftAvatarData,setDraftAvatarData]=useState(typeof savedProfile?.avatarData==='string' && /^data:image\/jpeg;base64,/.test(savedProfile.avatarData)?savedProfile.avatarData:'');
  const [profileError,setProfileError]=useState('');
  const [coins,setCoins]=useState(savedProfile?.coins ?? 80);
- const [completed,setCompleted]=useState(savedProfile?.completed ?? getInitialProgress());
+ const [completed,setCompleted]=useState(hasCompletedExampleProgress ? savedProfile.completed ?? getInitialProgress() : getInitialProgress());
+ const [completedExamples,setCompletedExamples]=useState(savedProfile?.completedExamples && typeof savedProfile.completedExamples==='object' && !Array.isArray(savedProfile.completedExamples) ? savedProfile.completedExamples : {});
  const [startingIslandId,setStartingIslandId]=useState(savedProfile?.startingIslandId ?? 1);
  const [totalAttempts,setTotalAttempts]=useState(savedProfile?.totalAttempts ?? 0);
  const [totalCorrect,setTotalCorrect]=useState(savedProfile?.totalCorrect ?? 0);
@@ -257,13 +233,13 @@ function App(){
      window.localStorage.setItem(profileStorageKey,JSON.stringify({
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
      }));
    }catch(error){
      console.error('Não foi possível salvar o progresso neste dispositivo.',error);
      setMessage('Não foi possível salvar o progresso neste dispositivo.');
    }
- },[screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
 
  useEffect(()=>{
    try{
@@ -305,7 +281,8 @@ function App(){
        return;
      }
      if(saved){
-       setSelectedIslandId(saved.selectedIslandId);
+       const hasSavedExampleProgress=saved.completedExamples!==undefined;
+       setSelectedIslandId(hasSavedExampleProgress ? saved.selectedIslandId : Math.min(saved.selectedIslandId,saved.startingIslandId ?? 1));
        setSelectedExampleIndex(saved.selectedExampleIndex);
        setXp(saved.xp);
        setProfileName(saved.profileName ?? 'Pedro');
@@ -313,7 +290,8 @@ function App(){
        setDraftProfileName(saved.profileName ?? 'Pedro');
        setDraftAvatarData(saved.avatarData ?? '');
        setCoins(saved.coins);
-       setCompleted(saved.completed);
+       setCompleted(hasSavedExampleProgress ? saved.completed : getInitialProgress());
+       setCompletedExamples(saved.completedExamples ?? {});
        setStartingIslandId(saved.startingIslandId ?? 1);
        setOwnedItems(saved.ownedItems);
        setTotalAttempts(saved.totalAttempts ?? 0);
@@ -360,7 +338,7 @@ function App(){
      const progress={
        version:1,
        screen:screen==='lesson'?'lesson':'home',
-       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
+       selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems
      };
      try{
        const {error}=await supabaseClient.from('profiles').upsert({
@@ -375,7 +353,7 @@ function App(){
      }
    },500);
    return ()=>window.clearTimeout(cloudSyncTimer.current);
- },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
+ },[currentUser,syncReady,screen,selectedIslandId,selectedExampleIndex,xp,profileName,avatarData,coins,completed,completedExamples,startingIslandId,ownedItems,totalAttempts,totalCorrect,practiceByIsland,reviewItems]);
 
  useEffect(()=>{
    if(!supabaseClient || !currentUser || screen!=='settings' || availableLanguages.length) return undefined;
@@ -617,17 +595,25 @@ function App(){
 
      if(matchedTranscript){
        setTotalCorrect((value)=>value+1);
-       setCompleted((value)=>Math.max(value,selectedIsland.id));
        setXp((value)=>value + 30);
        setCoins((value)=>value + 15);
-       setMessage('Muito bem! A fala foi reconhecida.');
-       if(selectedIsland.id < islands.length){
+       const islandCompletedExamples=addCompletedExample(completedExamples[selectedIsland.id],activeExampleIndex);
+       const nextExampleIndex=getNextUncompletedExampleIndex(islandCompletedExamples,activeExampleIndex,selectedIsland.examples.length);
+       setCompletedExamples((current)=>({...current,[selectedIsland.id]:islandCompletedExamples}));
+       if(nextExampleIndex===null){
+         setCompleted((value)=>Math.max(value,selectedIsland.id));
+         setMessage(`Parabéns! Você concluiu todos os ${selectedIsland.examples.length} itens desta ilha.`);
+       }else{
+         setSelectedExampleIndex(nextExampleIndex);
+         setMessage(`Muito bem! Próximo exemplo: ${nextExampleIndex+1} de ${selectedIsland.examples.length}.`);
+       }
+       if(nextExampleIndex===null && selectedIsland.id < islands.length){
          window.setTimeout(()=>{
            const nextIsland=islands.find((island)=>island.id===selectedIsland.id + 1);
            if(nextIsland){
              setSelectedIslandId(nextIsland.id);
-             setSelectedExampleIndex(0);
-             setMessage(`Parabéns! A próxima ilha já está liberada: ${nextIsland.title}.`);
+             setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[nextIsland.id],nextIsland.examples.length) ?? 0);
+             setMessage(`Ilha concluída! A próxima ilha foi liberada: ${nextIsland.title}.`);
            }
          },900);
        }
@@ -650,7 +636,7 @@ function App(){
      return;
    }
    setSelectedIslandId(island.id);
-   setSelectedExampleIndex(0);
+   setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[island.id],island.examples.length) ?? 0);
    setScreen('lesson');
    setMessage('');
  };
@@ -793,7 +779,8 @@ function App(){
           result={diagnosticResult}
           onContinue={() => {
             setSelectedIslandId(diagnosticResult.startingIslandId);
-            setSelectedExampleIndex(0);
+            const startingIsland=baseIslands.find((island)=>island.id===diagnosticResult.startingIslandId);
+            setSelectedExampleIndex(getFirstUncompletedExampleIndex(completedExamples[diagnosticResult.startingIslandId],startingIsland.examples.length) ?? 0);
             setScreen('lesson');
           }}
         />
